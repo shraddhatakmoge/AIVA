@@ -10,7 +10,7 @@ All routing logic lives in:
     browser_automation/web_handler.py
 """
 
-from features.browser_automation.web_handler import handle_web_command
+from AIVA.Shra.features.browser_automation.web_handler import handle_web_command
 
 
 def show_help():

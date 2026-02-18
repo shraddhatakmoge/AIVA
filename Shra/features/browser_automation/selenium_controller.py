@@ -3,6 +3,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.service import Service
 import time
+from selenium.common.exceptions import WebDriverException
 
 # Windows focus control
 import win32gui
@@ -20,13 +21,20 @@ _driver = None  # Global driver instance
 def get_driver():
     global _driver
 
-    if _driver is None:
+    try:
+        if _driver is None:
+            raise Exception("Driver not initialized")
+
+        # Try simple command to test if session alive
+        _driver.current_url
+
+    except:
+        print("[Driver] Creating new Chrome session...")
         service = Service(CHROME_DRIVER_PATH)
         _driver = webdriver.Chrome(service=service)
         _driver.maximize_window()
 
     return _driver
-
 
 # ---------------------------------------------------
 # Bring Chrome Window to Front (Windows Only)
