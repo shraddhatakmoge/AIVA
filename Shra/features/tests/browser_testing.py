@@ -1,61 +1,52 @@
-"""
-Browser Automation Testing File
---------------------------------
-This file is ONLY for testing browser automation module.
-
-It directly calls:
-    handle_web_command()
-
-All routing logic lives in:
-    browser_automation/web_handler.py
-"""
-
-from AIVA.Shra.features.browser_automation.web_handler import handle_web_command
+from AIVA.Shra.brain.llm.llm_client import LLMClient
+from AIVA.Shra.brain.llm.prompt_builder import PromptBuilder
+from AIVA.Shra.brain.llm.response_parser import ResponseParser
+from AIVA.Shra.brain.llm.memory import Memory
+from AIVA.Shra.brain.router import Router
+from AIVA.Shra.brain.simple_command_parser import SimpleCommandParser
+from AIVA.Shra.features.browser.controller import BrowserController
 
 
-def show_help():
-    print("\n=== AIVA Browser Automation Test Mode ===\n")
-
-    print("Open App Examples:")
-    print("  open youtube")
-    print("  open spotify")
-    print("  open gmail")
-    print("  open whatsapp")
-    print("  open google\n")
-
-    print("Play Examples:")
-    print("  play believer on spotify")
-    print("  play closer on youtube")
-    print("  spotify play shape of you\n")
-
-    print("Search Examples:")
-    print("  search artificial intelligence")
-    print("  search ai roadmap\n")
-
-    print("Mail Example:")
-    print("  send mail to test@gmail.com subject hello body how are you\n")
-
-    print("WhatsApp Example:")
-    print("  send whatsapp to Rahul hello bro\n")
-
-    print("Type 'help' to show this message.")
-    print("Type 'exit' to quit.\n")
+# Initialize components
+llm = LLMClient()
+prompt_builder = PromptBuilder()
+parser = ResponseParser()
+memory = Memory()
+router = Router()
+browser = BrowserController()
+simple_parser = SimpleCommandParser()
 
 
-if __name__ == "__main__":
+while True:
 
-    print("=== Browser Automation Testing Started ===")
-    show_help()
+    command = input("Enter command: ")
 
-    while True:
-        command = input(">>> ")
+    if command.lower() in ["exit", "quit"]:
+        break
 
-        if command.lower().strip() == "exit":
-            print("Exiting Browser Test Mode.")
-            break
+    # STEP 1 — Rule-based parsing first
+    simple_result = simple_parser.parse(command)
 
-        if command.lower().strip() == "help":
-            show_help()
-            continue
+    if simple_result:
+        structured = simple_result
+    else:
+        # STEP 2 — Use LLM for complex commands
+        prompt = prompt_builder.build(command, memory.get_context())
+        raw_response = llm.generate(prompt)
 
-        handle_web_command(command)
+        print("\n===== RAW LLM OUTPUT =====")
+        print(raw_response)
+        print("==========================\n")
+
+        parsed = parser.parse(raw_response)
+        structured = router.route(parsed)
+
+    # If router returned error
+    if structured.get("status") == "error":
+        print(structured)
+        continue
+
+    # Execute command
+    result = browser.handle(structured)
+
+    print(result)
