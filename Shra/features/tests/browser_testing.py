@@ -24,13 +24,17 @@ while True:
     if command.lower() in ["exit", "quit"]:
         break
 
+    # -------------------------------------------------
     # STEP 1 — Rule-based parsing first
+    # -------------------------------------------------
     simple_result = simple_parser.parse(command)
 
     if simple_result:
         structured = simple_result
     else:
+        # -------------------------------------------------
         # STEP 2 — Use LLM for complex commands
+        # -------------------------------------------------
         prompt = prompt_builder.build(command, memory.get_context())
         raw_response = llm.generate(prompt)
 
@@ -41,12 +45,21 @@ while True:
         parsed = parser.parse(raw_response)
         structured = router.route(parsed)
 
+    # -------------------------------------------------
     # If router returned error
+    # -------------------------------------------------
     if structured.get("status") == "error":
         print(structured)
         continue
 
+    # -------------------------------------------------
+    # 🔥 CRITICAL ADDITION — Attach Original Command
+    # -------------------------------------------------
+    structured["original_command"] = command
+
+    # -------------------------------------------------
     # Execute command
+    # -------------------------------------------------
     result = browser.handle(structured)
 
     print(result)

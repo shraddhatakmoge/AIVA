@@ -2,6 +2,7 @@ from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
+import os
 
 
 class DriverManager:
@@ -42,24 +43,27 @@ class DriverManager:
 
         chrome_options.add_argument("--start-maximized")
 
-        # 🔥 USE SEPARATE PROFILE FOLDER
-        chrome_options.add_argument(
-            r"--user-data-dir=C:\Users\Aniket\chrome_automation_profile"
-        )
+        # Use REAL trusted profile
+        chrome_options.add_argument(r"--user-data-dir=C:\AIVA_Real_Profile")
 
-        # Prevent DevToolsActivePort error
-        chrome_options.add_argument("--remote-debugging-port=9222")
+        # 🔥 VERY IMPORTANT: remove automation detection
+        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        chrome_options.add_experimental_option("useAutomationExtension", False)
 
-        # Stability flags
-        chrome_options.add_argument("--no-sandbox")
-        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--disable-blink-features=AutomationControlled")
 
         service = Service(ChromeDriverManager().install())
 
         self.driver = webdriver.Chrome(service=service, options=chrome_options)
 
-        print("✅ Chrome started with automation profile")
+        # 🔥 Hide webdriver flag
+        self.driver.execute_script("""
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => undefined
+            })
+        """)
 
+        print("✅ Chrome started with REAL trusted profile")
     # -------------------------------------------------
     # Safe Quit
     # -------------------------------------------------
