@@ -1,0 +1,10 @@
+2026/02/24-20:38:41.283 6e5c Reusing MANIFEST C:\Users\Aniket\PycharmProjects\SRCOE_datascience\AIVA-shra\AIVA\Shra\features\browser\chrome_profile\Default\IndexedDB\https_open.spotify.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/02/24-20:38:41.284 6e5c Recovering log #7
+2026/02/24-20:38:41.355 6e5c Reusing old log C:\Users\Aniket\PycharmProjects\SRCOE_datascience\AIVA-shra\AIVA\Shra\features\browser\chrome_profile\Default\IndexedDB\https_open.spotify.com_0.indexeddb.leveldb/000007.log 
+2026/02/24-20:38:48.435 6ab4 Level-0 table #12: started
+2026/02/24-20:38:48.471 6ab4 Level-0 table #12: 845131 bytes OK
+2026/02/24-20:38:48.473 6ab4 Delete type=0 #7
+2026/02/24-20:38:50.055 6ab4 Compacting 1@1 + 1@2 files
+2026/02/24-20:38:50.113 6ab4 Generated table #13@1: 4727 keys, 452318 bytes
+2026/02/24-20:38:50.114 6ab4 Compacted 1@1 + 1@2 files => 452318 bytes
+2026/02/24-20:38:50.116 6ab4 compacted to: files[ 0 0 1 0 0 0 0 ]

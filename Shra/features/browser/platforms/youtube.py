@@ -49,6 +49,45 @@ class YouTube:
             }
 
     # -------------------------------------------------
+    # INTERNAL: GET VIDEO ELEMENT
+    # -------------------------------------------------
+    def _get_video_element(self):
+        return self.driver.execute_script("""
+            return document.querySelector('video');
+        """)
+
+    # -------------------------------------------------
+    # INTERNAL: CHECK PLAY STATE
+    # -------------------------------------------------
+    def _is_playing(self):
+        return self.driver.execute_script("""
+            const video = document.querySelector('video');
+            if (!video) return null;
+            return !video.paused;
+        """)
+
+    # -------------------------------------------------
+    # 🔥 NEW: GET REAL CURRENT VIDEO TITLE
+    # -------------------------------------------------
+    def _get_current_video_title(self):
+        """
+        Extract canonical video title from YouTube player page.
+        """
+
+        try:
+            title_element = WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located(
+                    (By.XPATH, "//h1//yt-formatted-string")
+                )
+            )
+
+            title = title_element.text.strip().lower()
+            return title if title else None
+
+        except:
+            return None
+
+    # -------------------------------------------------
     # SEARCH
     # -------------------------------------------------
     def search(self, query):
@@ -81,7 +120,7 @@ class YouTube:
         }
 
     # -------------------------------------------------
-    # PLAY
+    # PLAY (CANONICAL FIX APPLIED)
     # -------------------------------------------------
     def play(self, query):
 
@@ -107,8 +146,9 @@ class YouTube:
             first_video = wait.until(
                 EC.presence_of_element_located((By.ID, "video-title"))
             )
+
             self.driver.execute_script("arguments[0].click();", first_video)
-            time.sleep(2)
+            time.sleep(3)
 
         except TimeoutException:
             return {
@@ -116,29 +156,49 @@ class YouTube:
                 "response": "No videos found."
             }
 
-        self.current_song = query
-        self.memory.add_history(query)
+        # 🔥 STORE REAL VIDEO TITLE
+        real_title = self._get_current_video_title()
+
+        if real_title:
+            self.current_song = real_title
+        else:
+            self.current_song = query.strip().lower()
+
+        self.memory.add_history(self.current_song)
 
         bring_browser_to_front()
 
         return {
             "status": "success",
-            "response": f"Playing '{query}' on YouTube"
+            "response": f"Playing '{self.current_song}' on YouTube"
         }
 
     # -------------------------------------------------
-    # -------------------------------------------------
-    # PAUSE (Direct JS Control - Reliable)
+    # PAUSE (STATE-AWARE)
     # -------------------------------------------------
     def pause(self):
 
         try:
+            state = self._is_playing()
+
+            if state is None:
+                return {
+                    "status": "error",
+                    "response": "No active video."
+                }
+
+            if not state:
+                return {
+                    "status": "info",
+                    "response": "YouTube is already paused."
+                }
+
             self.driver.execute_script("""
                 const video = document.querySelector('video');
-                if (video && !video.paused) {
-                    video.pause();
-                }
+                if (video) video.pause();
             """)
+
+            bring_browser_to_front()
 
             return {
                 "status": "success",
@@ -152,17 +212,31 @@ class YouTube:
             }
 
     # -------------------------------------------------
-    # RESUME (Direct JS Control - Reliable)
+    # RESUME (STATE-AWARE)
     # -------------------------------------------------
     def resume(self):
 
         try:
+            state = self._is_playing()
+
+            if state is None:
+                return {
+                    "status": "error",
+                    "response": "No active video."
+                }
+
+            if state:
+                return {
+                    "status": "info",
+                    "response": "YouTube is already playing."
+                }
+
             self.driver.execute_script("""
                 const video = document.querySelector('video');
-                if (video && video.paused) {
-                    video.play();
-                }
+                if (video) video.play();
             """)
+
+            bring_browser_to_front()
 
             return {
                 "status": "success",
@@ -176,12 +250,13 @@ class YouTube:
             }
 
     # -------------------------------------------------
-    # STOP (Alias to pause)
+    # STOP
     # -------------------------------------------------
     def stop(self):
         return self.pause()
+
     # -------------------------------------------------
-    # ADD TO FAVORITES
+    # ADD TO FAVORITES (FIXED RETURN HANDLING)
     # -------------------------------------------------
     def add_to_favorites(self):
 
@@ -193,18 +268,7 @@ class YouTube:
                 "response": "No song available to add."
             }
 
-        added = self.memory.add_favorite(song)
-
-        if not added:
-            return {
-                "status": "info",
-                "response": f"'{song}' already in favorites."
-            }
-
-        return {
-            "status": "success",
-            "response": f"Added '{song}' to favorites."
-        }
+        return self.memory.add_favorite(song)
 
     # -------------------------------------------------
     # REMOVE FROM FAVORITES
@@ -219,18 +283,7 @@ class YouTube:
                 "response": "No song specified."
             }
 
-        removed = self.memory.remove_favorite(song)
-
-        if not removed:
-            return {
-                "status": "info",
-                "response": f"'{song}' not found in favorites."
-            }
-
-        return {
-            "status": "success",
-            "response": f"Removed '{song}' from favorites."
-        }
+        return self.memory.remove_favorite(song)
 
     # -------------------------------------------------
     # PLAY RANDOM FAVORITE

@@ -7,39 +7,39 @@ class SimpleCommandParser:
         valid_platforms = ["youtube", "spotify", "google", "gmail", "whatsapp"]
 
         # =================================================
-        # CONTEXTUAL FAVORITE COMMANDS (VERY IMPORTANT)
+        # CLOSE ENTIRE BROWSER
         # =================================================
+        if command in ["close browser", "exit browser", "shutdown browser"]:
+            return {
+                "status": "success",
+                "action": "close_browser"
+            }
 
-        # Add current playing song to favorites
+        # =================================================
+        # CONTEXTUAL FAVORITE COMMANDS
+        # =================================================
         if "add this" in command and "favorite" in command:
             return {
                 "status": "success",
-                "action": "add_to_favorites",
-                "target": "youtube"
+                "action": "add_to_favorites"
             }
 
-        # Play random favorite
         if "play my favorite" in command:
             return {
                 "status": "success",
-                "action": "play_favorite",
-                "target": "youtube"
+                "action": "play_favorite"
             }
 
-        # Play last played
         if "play last song" in command:
             return {
                 "status": "success",
-                "action": "play_last",
-                "target": "youtube"
+                "action": "play_last"
             }
 
-        # Play yesterday played
         if "play yesterday" in command:
             return {
                 "status": "success",
-                "action": "play_yesterday",
-                "target": "youtube"
+                "action": "play_yesterday"
             }
 
         # =================================================
@@ -82,7 +82,6 @@ class SimpleCommandParser:
         if command.startswith("play "):
             remaining = command.replace("play ", "").strip()
 
-            # play xyz on youtube
             if " on " in remaining:
                 query, target = remaining.split(" on ", 1)
                 return {
@@ -92,7 +91,6 @@ class SimpleCommandParser:
                     "query": query.strip()
                 }
 
-            # play youtube (open youtube)
             if remaining in valid_platforms:
                 return {
                     "status": "success",
@@ -100,33 +98,23 @@ class SimpleCommandParser:
                     "target": remaining
                 }
 
-            # default → play on youtube
             return {
                 "status": "success",
                 "action": "play_music",
-                "target": "youtube",
                 "query": remaining
             }
 
         # =================================================
-        # CLOSE
+        # CLOSE TAB
         # =================================================
-        if command.startswith("close"):
-
+        if command.startswith("close "):
             parts = command.split()
 
-            # close youtube
             if len(parts) > 1 and parts[1] in valid_platforms:
                 return {
                     "status": "success",
                     "action": "close",
                     "target": parts[1]
                 }
-
-            return {
-                "status": "success",
-                "action": "close",
-                "target": "current"
-            }
 
         return None

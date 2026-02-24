@@ -1,3 +1,4 @@
+import inspect
 from selenium.common.exceptions import WebDriverException
 from AIVA.Shra.features.browser.driver import DriverManager
 from AIVA.Shra.features.browser.platforms.youtube import YouTube
@@ -14,6 +15,7 @@ class BrowserController:
         self.driver = None
         self.platform_instances = {}
         self.tabs = {}
+        self.last_active_platform = None
 
     # -------------------------------------------------
     # ENSURE DRIVER
@@ -37,6 +39,7 @@ class BrowserController:
         }
 
         self.tabs = {}
+        self.last_active_platform = None
 
     # -------------------------------------------------
     # OPEN TAB
@@ -48,6 +51,7 @@ class BrowserController:
         if not self.tabs:
             handle = self.driver.current_window_handle
             self.tabs[target] = handle
+            self.last_active_platform = target
             return platform.open()
 
         url = platform.get_url()
@@ -57,6 +61,8 @@ class BrowserController:
         self.driver.switch_to.window(new_handle)
 
         self.tabs[target] = new_handle
+        self.last_active_platform = target
+
         bring_browser_to_front()
 
         return {
@@ -77,6 +83,7 @@ class BrowserController:
         try:
             if handle in self.driver.window_handles:
                 self.driver.switch_to.window(handle)
+                self.last_active_platform = target
                 bring_browser_to_front()
                 return True
             else:
@@ -107,68 +114,129 @@ class BrowserController:
         return mapping.get(action, action)
 
     # -------------------------------------------------
-    # RULE BASED FAVORITE DETECTION
+    # TARGET DETECTION
     # -------------------------------------------------
-    def _rule_based_override(self, structured):
-
-        action = structured.get("action")
-        target = structured.get("target")
-        query = structured.get("query")
-
-        if action in ["play_music", "play"] and not query:
-            return {
-                "action": "add_to_favorites",
-                "target": target,
-                "query": None,
-                "original_command": structured.get("original_command")
-            }
-
-        return structured
-
-    # -------------------------------------------------
-    # SMART TARGET DETECTION
-    # -------------------------------------------------
-    def _detect_target_from_text(self, structured):
+    def _detect_target(self, structured):
 
         target = structured.get("target")
 
         if target:
             return target
 
-        original = structured.get("original_command", "")
-        original = original.lower()
+        if self.last_active_platform:
+            return self.last_active_platform
 
-        for platform_name in self.platform_instances.keys():
-            if platform_name in original:
-                return platform_name
-
-        # Default fallback
         return "youtube"
+
+    # -------------------------------------------------
+    # SAFE METHOD EXECUTION
+    # -------------------------------------------------
+    def _execute_platform_method(self, platform, action, query):
+
+        if not hasattr(platform, action):
+            return {
+                "status": "error",
+                "response": f"Action '{action}' not supported on this platform"
+            }
+
+        method = getattr(platform, action)
+
+        try:
+            signature = inspect.signature(method)
+            parameters = list(signature.parameters.values())
+
+            required_params = [
+                p for p in parameters
+                if p.default == inspect.Parameter.empty
+            ]
+
+            if len(required_params) > 0:
+                if not query:
+                    return {
+                        "status": "error",
+                        "response": f"'{action}' requires additional information."
+                    }
+                result = method(query)
+            else:
+                result = method()
+
+            if result is None:
+                return {
+                    "status": "error",
+                    "response": f"'{action}' did not return a response."
+                }
+
+            return result
+
+        except Exception as e:
+            return {
+                "status": "error",
+                "response": str(e)
+            }
 
     # -------------------------------------------------
     # HANDLE COMMAND
     # -------------------------------------------------
     def handle(self, structured):
 
-        self._ensure_driver()
-
-        structured = self._rule_based_override(structured)
+        if not structured:
+            return {
+                "status": "error",
+                "response": "Invalid command structure."
+            }
 
         action = structured.get("action")
         query = structured.get("query")
 
-        # 🔥 Smart target detection
-        target = self._detect_target_from_text(structured)
+        if not action:
+            return {
+                "status": "error",
+                "response": "No action provided."
+            }
+
+        # -------------------------------------------------
+        # CLOSE ENTIRE BROWSER (STRICT CHECK FIRST)
+        # -------------------------------------------------
+        if action == "close_browser":
+
+            if not self.driver:
+                return {
+                    "status": "error",
+                    "response": "No active browser session."
+                }
+
+            try:
+                self.driver.quit()
+                self.driver = None
+                self.tabs = {}
+                self.last_active_platform = None
+
+                return {
+                    "status": "success",
+                    "response": "Closed entire browser session."
+                }
+
+            except Exception as e:
+                return {
+                    "status": "error",
+                    "response": f"Failed to close browser: {str(e)}"
+                }
+
+        # -------------------------------------------------
+        # NORMAL FLOW
+        # -------------------------------------------------
+        self._ensure_driver()
+
+        target = self._detect_target(structured)
 
         if target not in self.platform_instances:
             return {
                 "status": "error",
-                "response": "Platform not supported"
+                "response": f"Platform '{target}' not supported"
             }
 
-        platform = self.platform_instances[target]
-
         action = self._normalize_action(action)
+        platform = self.platform_instances[target]
 
         # -------------------------------------------------
         # OPEN
@@ -184,56 +252,49 @@ class BrowserController:
             return self._open_new_tab(target)
 
         # -------------------------------------------------
-        # CLOSE
+        # CLOSE TAB
         # -------------------------------------------------
         if action == "close":
 
-            if target in self.tabs and self._switch_to_tab(target):
+            if target in self.tabs:
                 try:
+                    self._switch_to_tab(target)
                     self.driver.close()
                     self.tabs.pop(target, None)
+                    self.last_active_platform = None
+
                     return {
                         "status": "success",
                         "response": f"Closed {target.capitalize()}"
                     }
-                except Exception:
+
+                except Exception as e:
                     return {
                         "status": "error",
-                        "response": "Could not close tab"
+                        "response": f"Could not close tab: {str(e)}"
                     }
 
+            return {
+                "status": "error",
+                "response": f"{target.capitalize()} is not open."
+            }
+
         # -------------------------------------------------
-        # AUTO OPEN IF NOT OPEN
+        # AUTO OPEN
         # -------------------------------------------------
         if target not in self.tabs:
-            self._open_new_tab(target)
+            open_result = self._open_new_tab(target)
+            if open_result.get("status") != "success":
+                return open_result
         else:
             self._switch_to_tab(target)
 
         # -------------------------------------------------
-        # SAFE METHOD EXECUTION
+        # EXECUTE ACTION
         # -------------------------------------------------
-        if hasattr(platform, action):
+        result = self._execute_platform_method(platform, action, query)
 
-            method = getattr(platform, action)
+        if result.get("status") == "success":
+            self.last_active_platform = target
 
-            try:
-                if query:
-                    return method(query)
-                else:
-                    return method()
-            except TypeError:
-                return {
-                    "status": "error",
-                    "response": "Required information missing for this action."
-                }
-            except Exception as e:
-                return {
-                    "status": "error",
-                    "response": str(e)
-                }
-
-        return {
-            "status": "error",
-            "response": f"Action '{action}' not supported"
-        }
+        return result

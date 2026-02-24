@@ -8,28 +8,39 @@ class YouTubeMemory(BaseMemory):
     def __init__(self):
         super().__init__("youtube_memory.json")
 
-        if "favorites" not in self.data:
-            self.data["favorites"] = []
+        if not isinstance(self.data, dict):
+            self.data = {}
 
-        if "history" not in self.data:
-            self.data["history"] = []
-
-        if "last_played" not in self.data:
-            self.data["last_played"] = None
-
-        # ✅ NEW FIELD (important)
-        if "last_music" not in self.data:
-            self.data["last_music"] = None
+        self.data.setdefault("favorites", [])
+        self.data.setdefault("history", [])
+        self.data.setdefault("last_played", None)
+        self.data.setdefault("last_music", None)
 
         self._save()
+
+    # -------------------------------------------------
+    # UTIL
+    # -------------------------------------------------
+    def _normalize(self, text):
+        return text.strip().lower() if text else None
+
+    def _reload(self):
+        self.data = self._load()
+        self.data.setdefault("favorites", [])
+        self.data.setdefault("history", [])
+        self.data.setdefault("last_played", None)
+        self.data.setdefault("last_music", None)
 
     # -------------------------------------------------
     # HISTORY
     # -------------------------------------------------
     def add_history(self, song, is_music=True):
 
+        song = self._normalize(song)
         if not song:
             return
+
+        self._reload()
 
         entry = {
             "song": song,
@@ -39,19 +50,21 @@ class YouTubeMemory(BaseMemory):
         self.data["history"].append(entry)
         self.data["last_played"] = song
 
-        # ✅ Only update music tracker if actual music
         if is_music:
             self.data["last_music"] = song
 
         self._save()
 
     def get_last_played(self):
+        self._reload()
         return self.data.get("last_played")
 
     def get_last_music(self):
+        self._reload()
         return self.data.get("last_music")
 
     def get_yesterday_last(self):
+        self._reload()
 
         if len(self.data["history"]) < 2:
             return None
@@ -63,26 +76,58 @@ class YouTubeMemory(BaseMemory):
     # -------------------------------------------------
     def add_favorite(self, song):
 
+        song = self._normalize(song)
+
         if not song:
-            return False
+            return {
+                "status": "error",
+                "response": "Invalid song."
+            }
 
-        if song not in self.data["favorites"]:
-            self.data["favorites"].append(song)
-            self._save()
-            return True
+        self._reload()
 
-        return False
+        if song in self.data["favorites"]:
+            return {
+                "status": "info",
+                "response": f"'{song}' already in favorites."
+            }
+
+        self.data["favorites"].append(song)
+        self._save()
+
+        return {
+            "status": "success",
+            "response": f"Added '{song}' to favorites."
+        }
 
     def remove_favorite(self, song):
 
-        if song in self.data["favorites"]:
-            self.data["favorites"].remove(song)
-            self._save()
-            return True
+        song = self._normalize(song)
 
-        return False
+        if not song:
+            return {
+                "status": "error",
+                "response": "Invalid song."
+            }
+
+        self._reload()
+
+        if song not in self.data["favorites"]:
+            return {
+                "status": "info",
+                "response": f"'{song}' not found in favorites."
+            }
+
+        self.data["favorites"].remove(song)
+        self._save()
+
+        return {
+            "status": "success",
+            "response": f"Removed '{song}' from favorites."
+        }
 
     def get_random_favorite(self):
+        self._reload()
 
         if not self.data["favorites"]:
             return None
@@ -90,4 +135,5 @@ class YouTubeMemory(BaseMemory):
         return random.choice(self.data["favorites"])
 
     def get_all_favorites(self):
+        self._reload()
         return self.data["favorites"]

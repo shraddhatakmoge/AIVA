@@ -1,0 +1,46 @@
+{
+    "favorites": [
+        {
+            "song": "closer",
+            "spotify_id": null,
+            "added_at": "2026-02-24T20:39:48.600784"
+        }
+    ],
+    "history": [
+        {
+            "song": "closer",
+            "spotify_id": null,
+            "played_at": "2026-02-24T20:08:27.857520"
+        },
+        {
+            "song": "closer",
+            "spotify_id": null,
+            "played_at": "2026-02-24T20:09:03.716987"
+        },
+        {
+            "song": "closer",
+            "spotify_id": null,
+            "played_at": "2026-02-24T20:15:59.608333"
+        },
+        {
+            "song": "closer",
+            "spotify_id": null,
+            "played_at": "2026-02-24T20:18:03.353225"
+        },
+        {
+            "song": "closer",
+            "spotify_id": null,
+            "played_at": "2026-02-24T20:32:51.219281"
+        },
+        {
+            "song": "closer",
+            "spotify_id": null,
+            "played_at": "2026-02-24T20:33:58.358099"
+        },
+        {
+            "song": "closer",
+            "spotify_id": null,
+            "played_at": "2026-02-24T20:38:56.841036"
+        }
+    ]
+}

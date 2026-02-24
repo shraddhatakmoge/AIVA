@@ -1,16 +1,19 @@
 import time
+import urllib.parse
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from AIVA.Shra.features.browser.window_focus import bring_browser_to_front
+from AIVA.Shra.features.browser.memory.spotify_memory import SpotifyMemory
 
 
 class Spotify:
 
     def __init__(self, driver):
         self.driver = driver
+        self.memory = SpotifyMemory()
+        self.current_song = None
 
     # -------------------------------------------------
     # URL
@@ -23,28 +26,81 @@ class Spotify:
     # -------------------------------------------------
     def open(self):
         self.driver.get(self.get_url())
+
+        WebDriverWait(self.driver, 20).until(
+            EC.presence_of_element_located((By.TAG_NAME, "body"))
+        )
+
+        time.sleep(3)
         bring_browser_to_front()
+
         return {
             "status": "success",
             "response": "Opened Spotify"
         }
 
     # -------------------------------------------------
-    # LOGIN DETECTION (Stable)
+    # LOGIN DETECTION
     # -------------------------------------------------
     def _is_logged_in(self):
         try:
-            # If login button exists → NOT logged in
-            self.driver.find_element(
-                By.XPATH,
-                "//*[@data-testid='login-button']"
-            )
+            self.driver.find_element(By.XPATH, "//*[@data-testid='login-button']")
             return False
-        except:
+        except NoSuchElementException:
             return True
 
     # -------------------------------------------------
-    # SEARCH ONLY
+    # GET REAL CURRENT TRACK TITLE
+    # -------------------------------------------------
+    def _get_current_track_title(self):
+        try:
+            element = WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located(
+                    (By.XPATH, "//a[contains(@href,'/track/')]")
+                )
+            )
+
+            title = element.text.strip().lower()
+            return title if title else None
+
+        except Exception:
+            return None
+
+    # -------------------------------------------------
+    # GET PLAY/PAUSE BUTTON
+    # -------------------------------------------------
+    def _get_play_pause_button(self):
+        try:
+            return self.driver.find_element(
+                By.XPATH,
+                "//button[@data-testid='control-button-playpause']"
+            )
+        except:
+            return None
+
+    # -------------------------------------------------
+    # IS PLAYING CHECK
+    # -------------------------------------------------
+    def _is_playing(self):
+        btn = self._get_play_pause_button()
+        if not btn:
+            return False
+
+        aria = btn.get_attribute("aria-label")
+        return aria and "Pause" in aria
+
+    # -------------------------------------------------
+    # TOGGLE PLAY/PAUSE
+    # -------------------------------------------------
+    def _toggle_play_pause(self):
+        btn = self._get_play_pause_button()
+        if btn:
+            self.driver.execute_script("arguments[0].click();", btn)
+            return True
+        return False
+
+    # -------------------------------------------------
+    # SEARCH
     # -------------------------------------------------
     def search(self, query):
 
@@ -54,14 +110,13 @@ class Spotify:
                 "response": "No search query provided."
             }
 
-        wait = WebDriverWait(self.driver, 20)
-
         if not self._is_logged_in():
-            bring_browser_to_front()
             return {
                 "status": "login_required",
                 "response": "Please log in to Spotify once."
             }
+
+        wait = WebDriverWait(self.driver, 20)
 
         search_input = wait.until(
             EC.presence_of_element_located(
@@ -71,49 +126,20 @@ class Spotify:
 
         search_input.clear()
         search_input.send_keys(query)
-        search_input.send_keys(Keys.RETURN)
+        search_input.send_keys("\n")
 
         time.sleep(2)
         bring_browser_to_front()
 
         return {
             "status": "success",
-            "response": f"Searched {query} on Spotify"
+            "response": f"Searched '{query}' on Spotify"
         }
 
     # -------------------------------------------------
-    # VERIFY PLAYING (Stable Logic)
+    # PLAY (HARDENED VERSION)
     # -------------------------------------------------
-    def _is_playing(self):
-        try:
-            # If play button is visible → NOT playing
-            self.driver.find_element(
-                By.XPATH,
-                "//button[@data-testid='control-button-play']"
-            )
-            return False
-        except:
-            # Play button not found → currently playing
-            return True
-
-    # -------------------------------------------------
-    # FORCE PLAY BUTTON
-    # -------------------------------------------------
-    def _force_play(self):
-        try:
-            play_button = self.driver.find_element(
-                By.XPATH,
-                "//button[@data-testid='control-button-play']"
-            )
-            play_button.click()
-            return True
-        except:
-            return False
-
-    # -------------------------------------------------
-    # PLAY MUSIC (Reliable Version)
-    # -------------------------------------------------
-    def play_music(self, query):
+    def play(self, query):
 
         if not query:
             return {
@@ -121,94 +147,131 @@ class Spotify:
                 "response": "No song specified to play."
             }
 
-        wait = WebDriverWait(self.driver, 20)
+        self.open()
 
-        # Step 1: Search
-        search_result = self.search(query)
+        if not self._is_logged_in():
+            return {
+                "status": "login_required",
+                "response": "Please log in to Spotify once."
+            }
 
-        if isinstance(search_result, dict) and search_result.get("status") == "login_required":
-            return search_result
+        wait = WebDriverWait(self.driver, 30)
 
         try:
-            # Step 2: Locate first track
+            encoded_query = urllib.parse.quote(query)
+            songs_url = f"https://open.spotify.com/search/{encoded_query}/tracks"
+            self.driver.get(songs_url)
+
+            # Ensure tab is active
+            self.driver.switch_to.window(self.driver.current_window_handle)
+            bring_browser_to_front()
+
+            # Wait for first track to be clickable
             first_track = wait.until(
-                EC.presence_of_element_located(
+                EC.element_to_be_clickable(
                     (By.XPATH, "(//div[@data-testid='tracklist-row'])[1]")
                 )
             )
 
-            # Step 3: Scroll into view
-            self.driver.execute_script("arguments[0].scrollIntoView(true);", first_track)
+            # Scroll to element
+            self.driver.execute_script(
+                "arguments[0].scrollIntoView({block: 'center'});",
+                first_track
+            )
+
             time.sleep(1)
 
-            # Step 4: Click using JavaScript (most reliable)
-            self.driver.execute_script("arguments[0].click();", first_track)
+            # Force activation of document (important for autoplay)
+            self.driver.execute_script("window.focus();")
+
+            # Dispatch REAL double click event
+            self.driver.execute_script("""
+                arguments[0].dispatchEvent(new MouseEvent('dblclick', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window
+                }));
+            """, first_track)
+
+            time.sleep(3)
+
+            # If still not playing → force press play button
+            if not self._is_playing():
+                play_btn = self._get_play_pause_button()
+                if play_btn:
+                    self.driver.execute_script("arguments[0].click();", play_btn)
+
+            # Final verification wait
+            WebDriverWait(self.driver, 15).until(
+                lambda d: self._is_playing()
+            )
 
         except TimeoutException:
-            bring_browser_to_front()
             return {
                 "status": "error",
-                "response": "Could not find playable track."
+                "response": "Could not start playback."
             }
 
-        time.sleep(3)
-
-        # Step 5: Check if playing
-        if self._is_playing():
-            bring_browser_to_front()
+        except Exception as e:
             return {
-                "status": "success",
-                "response": f"Playing '{query}' on Spotify"
+                "status": "error",
+                "response": f"Playback failed: {str(e)}"
             }
 
-        # Step 6: Try force play fallback
-        if self._force_play():
-            time.sleep(2)
-            if self._is_playing():
-                bring_browser_to_front()
-                return {
-                    "status": "success",
-                    "response": f"Playing '{query}' on Spotify"
-                }
+        # Get actual title
+        real_title = self._get_current_track_title()
+
+        if real_title:
+            self.current_song = real_title
+        else:
+            self.current_song = query.strip().lower()
+
+        self.memory.add_history(self.current_song)
 
         bring_browser_to_front()
-        return {
-            "status": "error",
-            "response": "Playback did not start."
-        }
 
-    # -------------------------------------------------
-    # Alias for play
-    # -------------------------------------------------
-    def play(self, query):
-        return self.play_music(query)
+        return {
+            "status": "success",
+            "response": f"Playing '{self.current_song}' on Spotify"
+        }
 
     # -------------------------------------------------
     # PAUSE
     # -------------------------------------------------
     def pause(self):
-        try:
-            pause_btn = self.driver.find_element(
-                By.XPATH,
-                "//button[@data-testid='control-button-pause']"
-            )
-            pause_btn.click()
+
+        if not self._is_playing():
+            return {
+                "status": "info",
+                "response": "Spotify is already paused."
+            }
+
+        if self._toggle_play_pause():
+            time.sleep(2)
             bring_browser_to_front()
             return {
                 "status": "success",
                 "response": "Paused Spotify"
             }
-        except:
-            return {
-                "status": "error",
-                "response": "Nothing playing"
-            }
+
+        return {
+            "status": "error",
+            "response": "Could not pause Spotify"
+        }
 
     # -------------------------------------------------
     # RESUME
     # -------------------------------------------------
     def resume(self):
-        if self._force_play():
+
+        if self._is_playing():
+            return {
+                "status": "info",
+                "response": "Spotify is already playing."
+            }
+
+        if self._toggle_play_pause():
+            time.sleep(2)
             bring_browser_to_front()
             return {
                 "status": "success",
@@ -227,43 +290,34 @@ class Spotify:
         return self.pause()
 
     # -------------------------------------------------
-    # NEXT
+    # FAVORITES
     # -------------------------------------------------
-    def next(self):
-        try:
-            next_btn = self.driver.find_element(
-                By.XPATH,
-                "//button[@data-testid='control-button-skip-forward']"
-            )
-            next_btn.click()
-            bring_browser_to_front()
-            return {
-                "status": "success",
-                "response": "Skipped to next song"
-            }
-        except:
-            return {
-                "status": "error",
-                "response": "Cannot skip forward"
-            }
+    def add_to_favorites(self):
+        song = self.current_song or self.memory.get_last_played()
 
-    # -------------------------------------------------
-    # PREVIOUS
-    # -------------------------------------------------
-    def previous(self):
-        try:
-            prev_btn = self.driver.find_element(
-                By.XPATH,
-                "//button[@data-testid='control-button-skip-back']"
-            )
-            prev_btn.click()
-            bring_browser_to_front()
-            return {
-                "status": "success",
-                "response": "Went to previous song"
-            }
-        except:
-            return {
-                "status": "error",
-                "response": "Cannot skip backward"
-            }
+        if not song:
+            return {"status": "error", "response": "No song available to add."}
+
+        return self.memory.add_favorite(song)
+
+    def remove_favorite(self, query=None):
+        song = query or self.current_song
+
+        if not song:
+            return {"status": "error", "response": "No song specified."}
+
+        return self.memory.remove_favorite(song)
+
+    def play_favorite(self):
+        favorite = self.memory.get_random_favorite()
+        if not favorite:
+            return {"status": "error", "response": "No favorites saved."}
+
+        return self.play(favorite["song"])
+
+    def play_last(self):
+        last = self.memory.get_last_played()
+        if not last:
+            return {"status": "error", "response": "No history found."}
+
+        return self.play(last["song"])

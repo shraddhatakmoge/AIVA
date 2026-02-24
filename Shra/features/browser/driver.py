@@ -35,35 +35,54 @@ class DriverManager:
         return self.driver
 
     # -------------------------------------------------
-    # Start Chrome with Dedicated Automation Profile
+    # Start Chrome with Dedicated Project Profile
     # -------------------------------------------------
     def _start_driver(self):
 
         chrome_options = Options()
-
         chrome_options.add_argument("--start-maximized")
 
-        # Use REAL trusted profile
-        chrome_options.add_argument(r"--user-data-dir=C:\AIVA_Real_Profile")
+        # -------------------------------------------------
+        # 🔥 Portable Automation Profile (Works on Any Laptop)
+        # -------------------------------------------------
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        profile_path = os.path.join(base_dir, "chrome_profile")
 
-        # 🔥 VERY IMPORTANT: remove automation detection
+        # Create profile folder if not exists
+        if not os.path.exists(profile_path):
+            os.makedirs(profile_path)
+
+        chrome_options.add_argument(f"--user-data-dir={profile_path}")
+
+        # -------------------------------------------------
+        # Remove Automation Detection Flags
+        # -------------------------------------------------
         chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
         chrome_options.add_experimental_option("useAutomationExtension", False)
-
         chrome_options.add_argument("--disable-blink-features=AutomationControlled")
 
+        # -------------------------------------------------
+        # Start Driver
+        # -------------------------------------------------
         service = Service(ChromeDriverManager().install())
 
-        self.driver = webdriver.Chrome(service=service, options=chrome_options)
+        try:
+            self.driver = webdriver.Chrome(service=service, options=chrome_options)
+        except Exception as e:
+            print("❌ Failed to start Chrome:", e)
+            raise
 
-        # 🔥 Hide webdriver flag
+        # -------------------------------------------------
+        # Hide webdriver flag
+        # -------------------------------------------------
         self.driver.execute_script("""
             Object.defineProperty(navigator, 'webdriver', {
                 get: () => undefined
             })
         """)
 
-        print("✅ Chrome started with REAL trusted profile")
+        print("✅ Chrome started with dedicated automation profile")
+
     # -------------------------------------------------
     # Safe Quit
     # -------------------------------------------------

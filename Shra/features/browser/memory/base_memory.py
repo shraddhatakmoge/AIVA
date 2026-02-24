@@ -9,23 +9,29 @@ class BaseMemory:
         memory_dir = os.path.dirname(__file__)
         self.file_path = os.path.join(memory_dir, file_name)
 
-        self.data = {}
+        # Ensure file exists before loading
+        if not os.path.exists(self.file_path):
+            with open(self.file_path, "w", encoding="utf-8") as f:
+                json.dump({}, f)
 
-        self._load()
+        self.data = self._load()
 
     # -------------------------------------------------
     # LOAD MEMORY
     # -------------------------------------------------
     def _load(self):
 
-        if os.path.exists(self.file_path):
-            try:
-                with open(self.file_path, "r", encoding="utf-8") as f:
-                    self.data = json.load(f)
-            except Exception:
-                self.data = {}
-        else:
-            self._save()
+        try:
+            with open(self.file_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+                if not isinstance(data, dict):
+                    return {}
+
+                return data
+
+        except Exception:
+            return {}
 
     # -------------------------------------------------
     # SAVE MEMORY
