@@ -143,12 +143,46 @@ class YouTube:
         search_box.submit()
 
         try:
-            first_video = wait.until(
-                EC.presence_of_element_located((By.ID, "video-title"))
+            # Wait until results load
+            wait.until(
+                EC.presence_of_all_elements_located((By.XPATH, '//a[@id="video-title"]'))
             )
 
-            self.driver.execute_script("arguments[0].click();", first_video)
-            time.sleep(3)
+            videos = self.driver.find_elements(By.XPATH, '//a[@id="video-title"]')
+
+            selected_video = None
+            query_lower = query.lower()
+
+            for video in videos:
+                title = video.get_attribute("title")
+
+                if not title:
+                    continue
+
+                title_lower = title.lower()
+
+                # 🔥 Smart Filtering
+                if (
+                        query_lower in title_lower and
+                        "ad" not in title_lower and
+                        "news" not in title_lower and
+                        "live" not in title_lower
+                ):
+                    selected_video = video
+                    break
+
+            # If no smart match found, fallback to first visible video
+            if not selected_video and videos:
+                selected_video = videos[0]
+
+            if selected_video:
+                self.driver.execute_script("arguments[0].click();", selected_video)
+                time.sleep(3)
+            else:
+                return {
+                    "status": "error",
+                    "response": "No suitable video found."
+                }
 
         except TimeoutException:
             return {

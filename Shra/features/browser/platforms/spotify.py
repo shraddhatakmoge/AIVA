@@ -185,13 +185,26 @@ class Spotify:
             self.driver.execute_script("window.focus();")
 
             # Dispatch REAL double click event
-            self.driver.execute_script("""
-                arguments[0].dispatchEvent(new MouseEvent('dblclick', {
-                    bubbles: true,
-                    cancelable: true,
-                    view: window
-                }));
-            """, first_track)
+            # Scroll to first track
+            self.driver.execute_script(
+                "arguments[0].scrollIntoView({block: 'center'});",
+                first_track
+            )
+
+            time.sleep(1)
+
+            # Click play button inside row
+            play_button = first_track.find_element(
+                By.XPATH,
+                ".//button[@data-testid='play-button']"
+            )
+
+            self.driver.execute_script(
+                "arguments[0].click();",
+                play_button
+            )
+
+            time.sleep(3)
 
             time.sleep(3)
 
