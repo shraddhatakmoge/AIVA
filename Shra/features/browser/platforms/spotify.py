@@ -6,6 +6,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from AIVA.Shra.features.browser.window_focus import bring_browser_to_front
 from AIVA.Shra.features.browser.memory.spotify_memory import SpotifyMemory
+from selenium.webdriver.common.action_chains import ActionChains
 
 
 class Spotify:
@@ -194,16 +195,9 @@ class Spotify:
             time.sleep(1)
 
             # Click play button inside row
-            play_button = first_track.find_element(
-                By.XPATH,
-                ".//button[@data-testid='play-button']"
-            )
-
-            self.driver.execute_script(
-                "arguments[0].click();",
-                play_button
-            )
-
+            # Double click track to play
+            actions = ActionChains(self.driver)
+            actions.move_to_element(first_track).double_click().perform()
             time.sleep(3)
 
             time.sleep(3)

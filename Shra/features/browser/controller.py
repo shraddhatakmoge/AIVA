@@ -185,6 +185,22 @@ class BrowserController:
                 "response": "Invalid command structure."
             }
 
+        # -------------------------------------------------
+        # MULTI ACTION SUPPORT
+        # -------------------------------------------------
+        if "actions" in structured:
+
+            results = []
+
+            for act in structured["actions"]:
+                result = self.handle(act)
+                results.append(result)
+
+            return {
+                "status": "success",
+                "response": results
+            }
+
         action = structured.get("action")
         query = structured.get("query")
 
@@ -254,29 +270,20 @@ class BrowserController:
         # -------------------------------------------------
         # CLOSE TAB
         # -------------------------------------------------
-        # CLOSE TAB
-        # -------------------------------------------------
         if action == "close":
 
             if target in self.tabs:
                 try:
-                    # switch to tab we want to close
                     self._switch_to_tab(target)
-
-                    # close it
                     self.driver.close()
-
-                    # remove from tab memory
-                    closed_handle = self.tabs.pop(target, None)
+                    self.tabs.pop(target, None)
 
                     remaining_handles = self.driver.window_handles
 
-                    # if other tabs exist → switch to one
                     if remaining_handles:
                         self.driver.switch_to.window(remaining_handles[0])
                         bring_browser_to_front()
 
-                        # update last active platform
                         for name, handle in self.tabs.items():
                             if handle == remaining_handles[0]:
                                 self.last_active_platform = name
@@ -299,6 +306,7 @@ class BrowserController:
                 "status": "error",
                 "response": f"{target.capitalize()} is not open."
             }
+
         # -------------------------------------------------
         # AUTO OPEN
         # -------------------------------------------------

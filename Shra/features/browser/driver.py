@@ -43,16 +43,17 @@ class DriverManager:
         chrome_options.add_argument("--start-maximized")
 
         # -------------------------------------------------
-        # 🔥 Portable Automation Profile (Works on Any Laptop)
+        # Stability Flags
         # -------------------------------------------------
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        profile_path = os.path.join(base_dir, "chrome_profile")
+        chrome_options.add_argument("--no-first-run")
+        chrome_options.add_argument("--no-default-browser-check")
 
-        # Create profile folder if not exists
-        if not os.path.exists(profile_path):
-            os.makedirs(profile_path)
-
-        chrome_options.add_argument(f"--user-data-dir={profile_path}")
+        # -------------------------------------------------
+        # 🔥 Persistent Chrome Profile (Login stays saved)
+        # -------------------------------------------------
+        profile_path = r"C:\Users\Aniket\AIVA_chrome_profile"   # ✅ CHANGED
+        os.makedirs(profile_path, exist_ok=True)                # ✅ NEW
+        chrome_options.add_argument(f"--user-data-dir={profile_path}")  # ✅ CHANGED
 
         # -------------------------------------------------
         # Remove Automation Detection Flags
@@ -81,7 +82,7 @@ class DriverManager:
             })
         """)
 
-        print("✅ Chrome started with dedicated automation profile")
+        print("✅ Chrome started with persistent profile")
 
     # -------------------------------------------------
     # Safe Quit

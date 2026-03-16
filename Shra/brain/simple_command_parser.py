@@ -7,6 +7,27 @@ class SimpleCommandParser:
         valid_platforms = ["youtube", "spotify", "google", "gmail", "whatsapp"]
 
         # =================================================
+        # MULTI INTENT COMMANDS
+        # =================================================
+        if " and " in command:
+
+            parts = [p.strip() for p in command.split(" and ")]
+
+            actions = []
+
+            for part in parts:
+                parsed = self.parse(part)
+
+                if parsed and parsed.get("status") == "success":
+                    actions.append(parsed)
+
+            if actions:
+                return {
+                    "status": "success",
+                    "actions": actions
+                }
+
+        # =================================================
         # CLOSE ENTIRE BROWSER
         # =================================================
         if command in ["close browser", "exit browser", "shutdown browser"]:
