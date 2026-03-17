@@ -1,4 +1,7 @@
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys   # ✅ NEW
+from selenium.webdriver.support.ui import WebDriverWait   # ✅ NEW
+from selenium.webdriver.support import expected_conditions as EC   # ✅ NEW
 from AIVA.Shra.features.browser.window_focus import bring_browser_to_front
 
 
@@ -30,4 +33,35 @@ class Google:
         return {
             "status": "success",
             "response": "Opened Google"
+        }
+
+    # -------------------------------------------------
+    # SEARCH  ✅ NEW
+    # -------------------------------------------------
+    def search(self, query):
+
+        if not query:
+            return {
+                "status": "error",
+                "response": "No search query provided."
+            }
+
+        # Ensure Google is open
+        self.open()
+
+        wait = WebDriverWait(self.driver, 20)
+
+        search_box = wait.until(
+            EC.presence_of_element_located((By.NAME, "q"))
+        )
+
+        search_box.clear()
+        search_box.send_keys(query)
+        search_box.send_keys(Keys.RETURN)
+
+        bring_browser_to_front()
+
+        return {
+            "status": "success",
+            "response": f"Searched '{query}' on Google"
         }
