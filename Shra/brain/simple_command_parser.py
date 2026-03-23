@@ -7,7 +7,7 @@ class SimpleCommandParser:
         self.valid_platforms = ["youtube", "spotify", "google", "gmail", "whatsapp"]
 
         self.platform_aliases = {
-            "google": ["google", "googl", "gogle", "googel", "googel"],
+            "google": ["google", "googl", "gogle", "googel"],
             "youtube": ["youtube", "youtu", "youtub", "youtbe", "you tube", "yt"],
             "spotify": ["spotify", "spotfy", "spotifi", "spoti"],
             "gmail": ["gmail", "g mail", "gmaill", "mail"],
@@ -20,16 +20,13 @@ class SimpleCommandParser:
 
         target = target.lower().strip()
 
-        # exact match first
         if target in self.valid_platforms:
             return target
 
-        # alias match
         for platform, aliases in self.platform_aliases.items():
             if target in aliases:
                 return platform
 
-        # fuzzy match fallback
         match = get_close_matches(target, self.valid_platforms, n=1, cutoff=0.7)
         if match:
             return match[0]
@@ -37,14 +34,14 @@ class SimpleCommandParser:
         return target
 
     def parse(self, command: str):
-
-        command = command.lower().strip()
+        original_command = command.strip()
+        lower_command = command.lower().strip()
 
         # =================================================
         # MULTI INTENT COMMANDS
         # =================================================
-        if " and " in command:
-            parts = [p.strip() for p in command.split(" and ")]
+        if " and " in lower_command:
+            parts = [p.strip() for p in original_command.split(" and ")]
             actions = []
 
             for part in parts:
@@ -61,7 +58,7 @@ class SimpleCommandParser:
         # =================================================
         # CLOSE ENTIRE BROWSER
         # =================================================
-        if command in ["close browser", "exit browser", "shutdown browser"]:
+        if lower_command in ["close browser", "exit browser", "shutdown browser"]:
             return {
                 "status": "success",
                 "action": "close_browser"
@@ -70,25 +67,25 @@ class SimpleCommandParser:
         # =================================================
         # CONTEXTUAL FAVORITE COMMANDS
         # =================================================
-        if "add this" in command and "favorite" in command:
+        if "add this" in lower_command and "favorite" in lower_command:
             return {
                 "status": "success",
                 "action": "add_to_favorites"
             }
 
-        if "play my favorite" in command:
+        if "play my favorite" in lower_command:
             return {
                 "status": "success",
                 "action": "play_favorite"
             }
 
-        if "play last song" in command:
+        if "play last song" in lower_command:
             return {
                 "status": "success",
                 "action": "play_last"
             }
 
-        if "play yesterday" in command:
+        if "play yesterday" in lower_command:
             return {
                 "status": "success",
                 "action": "play_yesterday"
@@ -97,8 +94,8 @@ class SimpleCommandParser:
         # =================================================
         # OPEN
         # =================================================
-        if command.startswith("open "):
-            target = command.replace("open ", "").strip()
+        if lower_command.startswith("open "):
+            target = lower_command.replace("open ", "", 1).strip()
             target = self._normalize_platform(target)
 
             return {
@@ -108,11 +105,55 @@ class SimpleCommandParser:
             }
 
         # =================================================
+        # SEND MESSAGE
+        # =================================================
+        for prefix in ["send message ", "send "]:
+            if lower_command.startswith(prefix):
+                remaining_original = original_command[len(prefix):].strip()
+                remaining_lower = lower_command[len(prefix):].strip()
+
+                if " to " in remaining_lower:
+                    split_index = remaining_lower.rfind(" to ")
+
+                    message_part = remaining_original[:split_index].strip()
+                    recipient_part = remaining_original[split_index + 4:].strip()
+
+                    target = "whatsapp"
+
+                    recipient_lower = recipient_part.lower()
+                    if " on " in recipient_lower:
+                        on_index = recipient_lower.rfind(" on ")
+                        explicit_target = recipient_part[on_index + 4:].strip()
+                        recipient_part = recipient_part[:on_index].strip()
+
+                        normalized_target = self._normalize_platform(explicit_target)
+                        if normalized_target in self.valid_platforms:
+                            target = normalized_target
+
+                    clean_number = "".join(ch for ch in recipient_part if ch.isdigit())
+
+                    query = {
+                        "message": message_part
+                    }
+
+                    if clean_number and clean_number == recipient_part.replace(" ", ""):
+                        query["phone_number"] = clean_number
+                    else:
+                        query["contact_name"] = recipient_part.strip()
+
+                    return {
+                        "status": "success",
+                        "action": "send_message",
+                        "target": target,
+                        "query": query
+                    }
+
+        # =================================================
         # SEARCH
         # =================================================
         for prefix in ["search ", "seach ", "serch ", "sarch "]:
-            if command.startswith(prefix):
-                remaining = command[len(prefix):].strip()
+            if lower_command.startswith(prefix):
+                remaining = lower_command[len(prefix):].strip()
 
                 if " on " in remaining:
                     query, target = remaining.split(" on ", 1)
@@ -135,8 +176,8 @@ class SimpleCommandParser:
         # =================================================
         # PLAY
         # =================================================
-        if command.startswith("play "):
-            remaining = command.replace("play ", "").strip()
+        if lower_command.startswith("play "):
+            remaining = lower_command.replace("play ", "", 1).strip()
 
             if " on " in remaining:
                 query, target = remaining.split(" on ", 1)
@@ -167,8 +208,8 @@ class SimpleCommandParser:
         # =================================================
         # CLOSE TAB
         # =================================================
-        if command.startswith("close "):
-            target = command.replace("close ", "").strip()
+        if lower_command.startswith("close "):
+            target = lower_command.replace("close ", "", 1).strip()
             target = self._normalize_platform(target)
 
             if target in self.valid_platforms:

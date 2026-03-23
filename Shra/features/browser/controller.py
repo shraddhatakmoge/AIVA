@@ -65,10 +65,7 @@ class BrowserController:
 
         bring_browser_to_front()
 
-        return {
-            "status": "success",
-            "response": f"Opened {target.capitalize()}"
-        }
+        return platform.open()
 
     # -------------------------------------------------
     # SWITCH TAB
@@ -151,7 +148,7 @@ class BrowserController:
             ]
 
             if len(required_params) > 0:
-                if not query:
+                if query is None:
                     return {
                         "status": "error",
                         "response": f"'{action}' requires additional information."
@@ -312,7 +309,7 @@ class BrowserController:
         # -------------------------------------------------
         if target not in self.tabs:
             open_result = self._open_new_tab(target)
-            if open_result.get("status") != "success":
+            if open_result.get("status") not in ["success", "login_required"]:
                 return open_result
         else:
             self._switch_to_tab(target)
