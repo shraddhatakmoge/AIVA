@@ -1,4 +1,5 @@
 from difflib import get_close_matches
+import re
 
 
 class SimpleCommandParser:
@@ -102,6 +103,66 @@ class SimpleCommandParser:
                 "status": "success",
                 "action": "open",
                 "target": target
+            }
+
+        # =================================================
+        # READ MESSAGES
+        # =================================================
+        if lower_command in [
+            "read me my messages",
+            "read my messages",
+            "read messages",
+            "read latest messages",
+            "read whatsapp messages",
+        ]:
+            return {
+                "status": "success",
+                "action": "read_messages",
+                "target": "whatsapp",
+                "query": {
+                    "count": 5
+                }
+            }
+
+        if lower_command in [
+            "read unread messages",
+            "read my unread messages",
+            "read unread whatsapp messages",
+        ]:
+            return {
+                "status": "success",
+                "action": "read_messages",
+                "target": "whatsapp",
+                "query": {
+                    "count": 5,
+                    "unread_only": True
+                }
+            }
+
+        if lower_command.startswith("read messages from "):
+            contact_name = original_command[len("read messages from "):].strip()
+            return {
+                "status": "success",
+                "action": "read_messages",
+                "target": "whatsapp",
+                "query": {
+                    "contact_name": contact_name,
+                    "count": 5
+                }
+            }
+
+        match = re.match(r"read last (\d+) messages from (.+)", lower_command)
+        if match:
+            count = int(match.group(1))
+            contact_name = original_command[len(f"read last {match.group(1)} messages from "):].strip()
+            return {
+                "status": "success",
+                "action": "read_messages",
+                "target": "whatsapp",
+                "query": {
+                    "contact_name": contact_name,
+                    "count": count
+                }
             }
 
         # =================================================

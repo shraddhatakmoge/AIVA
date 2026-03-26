@@ -142,17 +142,8 @@ class BrowserController:
             signature = inspect.signature(method)
             parameters = list(signature.parameters.values())
 
-            required_params = [
-                p for p in parameters
-                if p.default == inspect.Parameter.empty
-            ]
-
-            if len(required_params) > 0:
-                if query is None:
-                    return {
-                        "status": "error",
-                        "response": f"'{action}' requires additional information."
-                    }
+            # 🔥 FIX: always pass query if method accepts ANY parameter
+            if len(parameters) > 0:
                 result = method(query)
             else:
                 result = method()
@@ -170,7 +161,6 @@ class BrowserController:
                 "status": "error",
                 "response": str(e)
             }
-
     # -------------------------------------------------
     # HANDLE COMMAND
     # -------------------------------------------------
