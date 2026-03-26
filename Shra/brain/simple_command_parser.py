@@ -112,7 +112,6 @@ class SimpleCommandParser:
             "read me my messages",
             "read my messages",
             "read messages",
-            "read latest messages",
             "read whatsapp messages",
         ]:
             return {
@@ -120,7 +119,21 @@ class SimpleCommandParser:
                 "action": "read_messages",
                 "target": "whatsapp",
                 "query": {
-                    "count": 5
+                    "count": 5,
+                    "unread_only": True
+                }
+            }
+
+        if lower_command in [
+            "read latest messages",
+        ]:
+            return {
+                "status": "success",
+                "action": "read_messages",
+                "target": "whatsapp",
+                "query": {
+                    "count": 5,
+                    "unread_only": False
                 }
             }
 

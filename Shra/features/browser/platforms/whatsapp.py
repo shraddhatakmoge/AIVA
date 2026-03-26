@@ -93,7 +93,7 @@ class WhatsApp:
         for method in methods:
             try:
                 method()
-                time.sleep(0.2)
+                time.sleep(0.25)
                 return True
             except Exception:
                 continue
@@ -113,72 +113,22 @@ class WhatsApp:
                 element = wait.until(
                     EC.presence_of_element_located((By.XPATH, xpath))
                 )
-                print(f"✅ Message box found with: {xpath}")
+
                 return element
             except Exception as e:
                 last_error = e
 
         raise TimeoutException(f"Message box not found. Last error: {last_error}")
 
-    def _click_new_chat(self, timeout=8):
-        wait = WebDriverWait(self.driver, timeout)
-        selectors = [
-            "//button[@title='New chat']",
-            "//span[@data-icon='new-chat-outline']/ancestor::button[1]",
-            "//div[@title='New chat']",
-            "//button[contains(@aria-label,'New chat')]",
-        ]
-
-        last_error = None
-        for xpath in selectors:
-            try:
-                el = wait.until(EC.element_to_be_clickable((By.XPATH, xpath)))
-                if self._click_element(el):
-                    print(f"✅ New chat clicked with: {xpath}")
-                    time.sleep(0.8)
-                    return True
-            except Exception as e:
-                last_error = e
-
-        raise TimeoutException(f"New chat button not found. Last error: {last_error}")
-
-    def _find_new_chat_search_box(self, timeout=10):
-        end_time = time.time() + timeout
-        last_error = None
-
-        selectors = [
-            "//div[@role='dialog']//div[@contenteditable='true' and @role='textbox']",
-            "//div[@role='dialog']//div[@contenteditable='true']",
-            "(//div[@contenteditable='true' and @role='textbox' and not(ancestor::footer)])[1]",
-            "(//div[@contenteditable='true' and not(ancestor::footer)])[1]",
-            "//div[@contenteditable='true' and @data-tab='3' and not(ancestor::footer)]",
-            "//div[@contenteditable='true' and @data-tab='2' and not(ancestor::footer)]",
-        ]
-
-        while time.time() < end_time:
-            for xpath in selectors:
-                try:
-                    elements = self.driver.find_elements(By.XPATH, xpath)
-                    for el in elements:
-                        try:
-                            if el.is_displayed() and el.is_enabled():
-                                print(f"✅ New chat search box found with: {xpath}")
-                                return el
-                        except Exception:
-                            continue
-                except Exception as e:
-                    last_error = e
-            time.sleep(0.4)
-
-        raise TimeoutException(f"New chat search box not found. Last error: {last_error}")
+    def _clear_box(self, element):
+        element.click()
+        time.sleep(0.1)
+        element.send_keys(Keys.CONTROL, "a")
+        time.sleep(0.1)
+        element.send_keys(Keys.BACKSPACE)
+        time.sleep(0.2)
 
     def _find_sidebar_search_box(self, timeout=10):
-        """
-        Robust approach:
-        - collect all visible editable elements
-        - ignore footer message box
-        - choose the top-left visible textbox, which is typically the main sidebar search
-        """
         end_time = time.time() + timeout
         last_error = None
 
@@ -224,9 +174,6 @@ class WhatsApp:
         raise TimeoutException(f"Sidebar search box not found. Last error: {last_error}")
 
     def _focus_sidebar_search_box(self, timeout=10):
-        """
-        Click the chosen visible top-left editable element and reuse active element if possible.
-        """
         search_box = self._find_sidebar_search_box(timeout=timeout)
 
         if not self._click_element(search_box):
@@ -246,14 +193,6 @@ class WhatsApp:
             pass
 
         return search_box
-
-    def _clear_box(self, element):
-        element.click()
-        time.sleep(0.1)
-        element.send_keys(Keys.CONTROL, "a")
-        time.sleep(0.1)
-        element.send_keys(Keys.BACKSPACE)
-        time.sleep(0.2)
 
     def _find_first_contact_result(self, timeout=8):
         wait = WebDriverWait(self.driver, timeout)
@@ -343,6 +282,560 @@ class WhatsApp:
             print(f"⚠ Main search flow failed: {e}")
 
         return False
+
+    # -------------------------------------------------
+    # UNREAD MESSAGE HELPERS
+    # -------------------------------------------------
+    def _click_chat_filter(self, filter_name, timeout=6):
+        end_time = time.time() + timeout
+        filter_name_lower = filter_name.strip().lower()
+        last_error = None
+
+        selectors = [
+            f"//button[.//span[starts-with(normalize-space(), '{filter_name}')]]",
+            f"//button[starts-with(normalize-space(.), '{filter_name}')]",
+            f"//span[starts-with(normalize-space(), '{filter_name}')]/ancestor::button[1]",
+            f"//*[self::button or ancestor::button][starts-with(normalize-space(.), '{filter_name}')]",
+            f"//div[@role='button'][starts-with(normalize-space(.), '{filter_name}')]",
+            f"//span[starts-with(normalize-space(), '{filter_name}')]/ancestor::*[@role='button'][1]",
+        ]
+
+        while time.time() < end_time:
+            for xpath in selectors:
+                try:
+                    elements = self.driver.find_elements(By.XPATH, xpath)
+                    for el in elements:
+                        try:
+                            if not el.is_displayed() or not el.is_enabled():
+                                continue
+
+                            text = " ".join((el.text or "").split()).strip().lower()
+                            if filter_name_lower == "all":
+                                if not text.startswith("all"):
+                                    continue
+                            elif filter_name_lower == "unread":
+                                if not text.startswith("unread"):
+                                    continue
+
+                            if self._click_element(el):
+
+                                time.sleep(1.0)
+                                return True
+                        except Exception as e:
+                            last_error = e
+                            continue
+                except Exception as e:
+                    last_error = e
+
+            time.sleep(0.4)
+
+        print(f"⚠ Could not click chat filter '{filter_name}'. Last error: {last_error}")
+        return False
+
+    def _is_left_pane_candidate(self, element):
+        try:
+            if not element.is_displayed():
+                return False
+
+            rect = element.rect or {}
+            x = rect.get("x", 0)
+            y = rect.get("y", 0)
+            width = rect.get("width", 0)
+            height = rect.get("height", 0)
+
+            if width < 120 or height < 30:
+                return False
+
+            viewport_width = self.driver.execute_script("return window.innerWidth") or 1400
+
+            if x > (viewport_width * 0.55):
+                return False
+
+            if y < 120:
+                return False
+
+            return True
+        except Exception:
+            return False
+
+    def _find_visible_chat_rows_via_xpath(self):
+        selectors = [
+            "//div[@role='listitem']",
+            "//div[@data-testid='cell-frame-container']",
+            "//div[@data-testid='chat-list-item']",
+            "//span[@title]/ancestor::div[@role='listitem'][1]",
+            "//span[@title]/ancestor::div[@data-testid='cell-frame-container'][1]",
+            "//span[@title]/ancestor::div[@data-testid='chat-list-item'][1]",
+            "//span[@title]/ancestor::div[3]",
+            "//span[@title]/ancestor::div[4]",
+            "//span[@title]/ancestor::div[5]",
+            "//span[@title]/ancestor::div[6]",
+        ]
+
+        rows = []
+        seen = set()
+
+        for xpath in selectors:
+            try:
+                elements = self.driver.find_elements(By.XPATH, xpath)
+                for el in elements:
+                    try:
+                        if not self._is_left_pane_candidate(el):
+                            continue
+
+                        key = el.id
+                        if key in seen:
+                            continue
+
+                        name = self._extract_chat_name_from_row(el)
+                        if not name or name.lower() in {"all", "unread", "groups", "favourites", "favorites"}:
+                            continue
+
+                        seen.add(key)
+                        rows.append(el)
+                    except Exception:
+                        continue
+            except Exception:
+                continue
+
+        return rows
+
+    def _find_visible_chat_rows_via_js(self):
+        try:
+            elements = self.driver.execute_script("""
+                const results = [];
+                const seen = new Set();
+                const spans = Array.from(document.querySelectorAll('span[title]'));
+                const maxX = window.innerWidth * 0.55;
+
+                for (const span of spans) {
+                    const title = (span.getAttribute('title') || '').trim();
+                    if (!title) continue;
+
+                    const bad = ['All', 'Unread', 'Groups', 'Favourites', 'Favorites'];
+                    if (bad.includes(title)) continue;
+
+                    let node = span;
+                    for (let i = 0; i < 8 && node; i++) {
+                        node = node.parentElement;
+                        if (!node) break;
+
+                        const r = node.getBoundingClientRect();
+                        const style = window.getComputedStyle(node);
+
+                        if (
+                            r.width >= 120 &&
+                            r.height >= 32 &&
+                            r.left >= 0 &&
+                            r.left <= maxX &&
+                            r.top >= 120 &&
+                            r.bottom <= window.innerHeight + 5 &&
+                            style.display !== 'none' &&
+                            style.visibility !== 'hidden'
+                        ) {
+                            if (!seen.has(node)) {
+                                seen.add(node);
+                                results.push(node);
+                            }
+                            break;
+                        }
+                    }
+                }
+                return results;
+            """)
+
+            return elements or []
+        except Exception:
+            return []
+
+    def _find_visible_chat_rows(self):
+        rows = []
+        seen = set()
+
+        for source_rows in [self._find_visible_chat_rows_via_xpath(), self._find_visible_chat_rows_via_js()]:
+            for el in source_rows:
+                try:
+                    if not self._is_left_pane_candidate(el):
+                        continue
+
+                    key = el.id
+                    if key in seen:
+                        continue
+
+                    name = self._extract_chat_name_from_row(el)
+                    if not name or name.lower() in {"all", "unread", "groups", "favourites", "favorites"}:
+                        continue
+
+                    seen.add(key)
+                    rows.append(el)
+                except Exception:
+                    continue
+
+        try:
+            rows.sort(key=lambda e: (e.rect or {}).get("y", 999999))
+        except Exception:
+            pass
+
+        return rows
+
+    def _extract_chat_name_from_row(self, row):
+        selectors = [
+            ".//span[@title]",
+            ".//div[@dir='auto']//span",
+            ".//span[contains(@class,'x1iyjqo2')]",
+        ]
+
+        for xpath in selectors:
+            try:
+                elements = row.find_elements(By.XPATH, xpath)
+                for el in elements:
+                    try:
+                        text = (el.get_attribute("title") or el.text or "").strip()
+                        if text:
+                            return text
+                    except Exception:
+                        continue
+            except Exception:
+                continue
+
+        try:
+            text = " ".join((row.text or "").split()).strip()
+            if text:
+                return text.split("\n")[0].strip()
+        except Exception:
+            pass
+
+        return "Unknown chat"
+
+    def _open_first_unread_chat(self, timeout=10):
+        end_time = time.time() + timeout
+
+        while time.time() < end_time:
+            rows = self._find_visible_chat_rows()
+            print(f"🔎 Visible chat rows after filter: {len(rows)}")
+
+            for i, row in enumerate(rows[:10], start=1):
+                try:
+                    chat_name = self._extract_chat_name_from_row(row)
+                    print(f"   Row {i}: {chat_name}")
+
+                    if self._click_element(row):
+                        time.sleep(1.2)
+
+                        if self._is_chat_open():
+                            self.current_chat = chat_name
+                            print(f"✅ Unread chat opened: {chat_name}")
+                            return chat_name
+                except Exception as e:
+                    print(f"⚠ Failed clicking filtered row {i}: {e}")
+                    continue
+
+            time.sleep(0.5)
+
+        return None
+
+    def _extract_text_from_message_element(self, el):
+        try:
+            text_parts = el.find_elements(By.XPATH, ".//span[@dir='ltr'] | .//div[@dir='auto']")
+            collected = []
+
+            for part in text_parts:
+                try:
+                    t = (part.text or "").strip()
+                    if t:
+                        collected.append(t)
+                except Exception:
+                    continue
+
+            if collected:
+                text = "\n".join(collected).strip()
+            else:
+                text = (el.text or "").strip()
+
+            text = " ".join(text.split()).strip()
+            return text
+        except Exception:
+            return ""
+
+    def _read_latest_unread_messages_from_open_chat(self, limit=2):
+        divider_y = None
+
+        divider_selectors = [
+            "//*[contains(translate(normalize-space(.), 'UNREAD MESSAGE', 'unread message'), 'unread message')]",
+            "//*[contains(translate(normalize-space(.), 'UNREAD MESSAGES', 'unread messages'), 'unread messages')]",
+        ]
+
+        for xpath in divider_selectors:
+            try:
+                elements = self.driver.find_elements(By.XPATH, xpath)
+                for el in elements:
+                    if el.is_displayed():
+                        divider_y = (el.rect or {}).get("y", None)
+                        break
+                if divider_y is not None:
+                    break
+            except:
+                pass
+
+        # 🔥 FIX: ignore broken divider
+        if divider_y == 0:
+            divider_y = None
+
+        incoming = self.driver.find_elements(By.XPATH, "//div[contains(@class,'message-in')]")
+
+        if not incoming:
+            return []
+
+        messages = []
+
+        for el in incoming:
+            try:
+                y = (el.rect or {}).get("y", 0)
+
+                if divider_y is not None and y <= divider_y:
+                    continue
+
+                text = self._extract_text_from_message_element(el)
+                if text:
+                    messages.append(text)
+            except:
+                continue
+
+        # 🔥 ONLY LAST UNREAD MESSAGE
+        if messages:
+            return [messages[-1]]
+
+        # fallback → last incoming only
+        for el in reversed(incoming):
+            text = self._extract_text_from_message_element(el)
+            if text:
+                return [text]
+
+        return []
+
+    def _read_last_messages_from_open_chat(self, limit=2):
+        selectors = [
+            "//div[contains(@class,'message-in')]",
+            "//div[contains(@data-testid,'msg-container') and .//div[contains(@class,'message-in')]]",
+            "//div[contains(@class,'focusable-list-item')][.//div[contains(@class,'message-in')]]",
+        ]
+
+        messages = []
+
+        for xpath in selectors:
+            try:
+                elements = self.driver.find_elements(By.XPATH, xpath)
+                if elements:
+                    for el in elements[-12:]:
+                        text = self._extract_text_from_message_element(el)
+                        if text:
+                            messages.append(text)
+
+                    if messages:
+                        break
+            except Exception:
+                continue
+
+        cleaned = []
+        for msg in messages:
+            msg = " ".join(msg.split())
+            if msg and msg not in cleaned:
+                cleaned.append(msg)
+
+        return cleaned[-limit:]
+
+    def _read_last_messages_from_current_chat(self, count=5):
+        selectors = [
+            "//div[contains(@class,'message-in')]",
+            "//div[contains(@class,'message-out')]",
+            "//div[contains(@data-testid,'msg-container')]",
+            "//div[contains(@class,'focusable-list-item')]",
+        ]
+
+        collected = []
+
+        for xpath in selectors:
+            try:
+                elements = self.driver.find_elements(By.XPATH, xpath)
+                if not elements:
+                    continue
+
+                for el in elements[-20:]:
+                    try:
+                        text = (el.text or "").strip()
+                        if text:
+                            text = " ".join(text.split())
+                            if text and text not in collected:
+                                collected.append(text)
+                    except Exception:
+                        continue
+
+                if collected:
+                    break
+
+            except Exception:
+                continue
+
+        return collected[-count:]
+
+    def _read_messages_from_contact(self, contact_name, count=5):
+        opened = self._open_chat_by_contact_name(contact_name)
+        if not opened:
+            return {
+                "status": "error",
+                "response": f"Could not open contact '{contact_name}'."
+            }
+
+        messages = self._read_last_messages_from_current_chat(count=count)
+
+        if not messages:
+            return {
+                "status": "error",
+                "response": f"No readable messages found in chat '{contact_name}'."
+            }
+
+        formatted = " | ".join(
+            [f"{i + 1}. {msg}" for i, msg in enumerate(messages)]
+        )
+
+        return {
+            "status": "success",
+            "response": f"Last {len(messages)} messages from {contact_name}: {formatted}"
+        }
+
+    # -------------------------------------------------
+    # READ UNREAD MESSAGES
+    # -------------------------------------------------
+    def read_unread_messages(self, query=None):
+        try:
+            bring_browser_to_front()
+
+            if not self._is_logged_in():
+                if not self._wait_until_logged_in(timeout=60):
+                    return {
+                        "status": "login_required",
+                        "response": "Please scan the WhatsApp QR code to continue."
+                    }
+
+            if not self._click_chat_filter("Unread", timeout=6):
+                return {
+                    "status": "error",
+                    "response": "Could not click the Unread filter."
+                }
+
+            time.sleep(1.2)
+
+            rows = self._find_visible_chat_rows()
+
+            if not rows:
+                self._click_chat_filter("All", timeout=3)
+                return {"status": "success", "response": "No unread messages"}
+
+            final_output = []
+            seen_chats = set()  # 🔥 FIX: remove duplicates
+
+            for row in rows:
+                try:
+                    chat_name = self._extract_chat_name_from_row(row)
+
+                    # skip duplicates
+                    if chat_name in seen_chats:
+                        continue
+                    seen_chats.add(chat_name)
+
+                    if not self._click_element(row):
+                        continue
+
+                    time.sleep(1)
+
+                    if not self._is_chat_open():
+                        continue
+
+                    self.current_chat = chat_name
+
+                    messages = self._read_latest_unread_messages_from_open_chat()
+
+                    if messages:
+                        final_output.append(f"{chat_name}: {messages[0]}")
+
+                except:
+                    continue
+
+            self._click_chat_filter("All", timeout=3)
+
+            if not final_output:
+                return {"status": "success", "response": "No unread messages"}
+
+            return {
+                "status": "success",
+                "response": "\n".join(final_output)
+            }
+
+        except Exception as e:
+            try:
+                self._click_chat_filter("All", timeout=2)
+            except:
+                pass
+
+            return {
+                "status": "error",
+                "response": f"WhatsApp unread read failed: {e}"
+            }
+
+    def read_messages(self, query=None):
+        query = query or {}
+
+        count = query.get("count", 5)
+        unread_only = query.get("unread_only", False)
+        contact_name = query.get("contact_name")
+
+        try:
+            bring_browser_to_front()
+
+            if not self._is_logged_in():
+                print("📱 Please scan QR code once...")
+                if not self._wait_until_logged_in(timeout=60):
+                    return {
+                        "status": "login_required",
+                        "response": "Please scan the WhatsApp QR code to continue."
+                    }
+
+            if unread_only:
+                return self.read_unread_messages({"limit": count})
+
+            if contact_name:
+                return self._read_messages_from_contact(contact_name, count=count)
+
+            if not self._is_chat_open():
+                return {
+                    "status": "error",
+                    "response": "No WhatsApp chat is currently open."
+                }
+
+            messages = self._read_last_messages_from_current_chat(count=count)
+
+            if not messages:
+                return {
+                    "status": "error",
+                    "response": "No readable messages found in the current chat."
+                }
+
+            chat_name = self.current_chat or "current chat"
+
+            formatted = " | ".join(
+                [f"{i + 1}. {msg}" for i, msg in enumerate(messages)]
+            )
+
+            return {
+                "status": "success",
+                "response": f"Last {len(messages)} messages from {chat_name}: {formatted}"
+            }
+
+        except Exception as e:
+            return {
+                "status": "error",
+                "response": f"WhatsApp read failed: {e}"
+            }
 
     # -------------------------------------------------
     # SEND MESSAGE
