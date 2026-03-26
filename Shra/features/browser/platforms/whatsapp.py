@@ -163,7 +163,6 @@ class WhatsApp:
                 if visible_candidates:
                     visible_candidates.sort(key=lambda item: (item[0], item[1]))
                     chosen = visible_candidates[0][2]
-                    print("✅ Sidebar search box found via visible editable element scan")
                     return chosen
 
             except Exception as e:
@@ -187,7 +186,6 @@ class WhatsApp:
                 tag = (active.tag_name or "").lower()
                 contenteditable = (active.get_attribute("contenteditable") or "").lower()
                 if tag in ["input", "textarea"] or contenteditable == "true":
-                    print("✅ Active element is usable for sidebar search")
                     return active
         except Exception:
             pass
@@ -206,7 +204,6 @@ class WhatsApp:
         for xpath in selectors:
             try:
                 el = wait.until(EC.presence_of_element_located((By.XPATH, xpath)))
-                print(f"✅ First contact result found with: {xpath}")
                 return el
             except Exception as e:
                 last_error = e
@@ -230,7 +227,6 @@ class WhatsApp:
                     for el in elements:
                         try:
                             if el.is_displayed():
-                                print(f"✅ Exact contact result found with: {xpath}")
                                 return el
                         except Exception:
                             continue
@@ -238,7 +234,7 @@ class WhatsApp:
                     last_error = e
             time.sleep(0.4)
 
-        print(f"⚠ Exact contact '{contact_name}' not found. Falling back to first result.")
+
         return self._find_first_contact_result(timeout=5)
 
     def _is_chat_open(self):
@@ -249,14 +245,13 @@ class WhatsApp:
             return False
 
     def _open_chat_by_contact_name(self, contact_name):
-        print(f"🔎 Trying to open chat for: {contact_name}")
 
+        # if already open
         if (
-            self.current_chat
-            and self.current_chat.strip().lower() == contact_name.strip().lower()
-            and self._is_chat_open()
+                self.current_chat
+                and self.current_chat.strip().lower() == contact_name.strip().lower()
+                and self._is_chat_open()
         ):
-            print("✅ Chat already open, skipping contact search")
             return True
 
         try:
@@ -264,25 +259,24 @@ class WhatsApp:
             self._clear_box(search_box)
             search_box.click()
             time.sleep(0.2)
-            search_box.send_keys(contact_name)
-            print("✅ Contact name typed in main WhatsApp search")
-            time.sleep(1.5)
 
-            result = self._find_exact_contact_result(contact_name, timeout=6)
+            search_box.send_keys(contact_name)
+            time.sleep(1.2)
+
+            # 🔥 ALWAYS TAKE FIRST RESULT (NO EXACT MATCH DRAMA)
+            result = self._find_first_contact_result(timeout=6)
+
             if self._click_element(result):
-                print("✅ Contact result clicked from main search")
                 time.sleep(1)
 
                 if self._is_chat_open():
                     self.current_chat = contact_name
-                    print("✅ Chat opened successfully via main search")
                     return True
 
-        except Exception as e:
-            print(f"⚠ Main search flow failed: {e}")
+        except Exception:
+            pass
 
         return False
-
     # -------------------------------------------------
     # UNREAD MESSAGE HELPERS
     # -------------------------------------------------
@@ -329,7 +323,7 @@ class WhatsApp:
 
             time.sleep(0.4)
 
-        print(f"⚠ Could not click chat filter '{filter_name}'. Last error: {last_error}")
+
         return False
 
     def _is_left_pane_candidate(self, element):
@@ -512,7 +506,6 @@ class WhatsApp:
 
         while time.time() < end_time:
             rows = self._find_visible_chat_rows()
-            print(f"🔎 Visible chat rows after filter: {len(rows)}")
 
             for i, row in enumerate(rows[:10], start=1):
                 try:
@@ -524,7 +517,6 @@ class WhatsApp:
 
                         if self._is_chat_open():
                             self.current_chat = chat_name
-                            print(f"✅ Unread chat opened: {chat_name}")
                             return chat_name
                 except Exception as e:
                     print(f"⚠ Failed clicking filtered row {i}: {e}")
