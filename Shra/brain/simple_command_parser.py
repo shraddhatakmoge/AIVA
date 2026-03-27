@@ -34,6 +34,60 @@ class SimpleCommandParser:
 
         return target
 
+    def _parse_send_file_command(self, original_command: str, lower_command: str):
+        file_match = re.match(
+            r"^send\s+(?:(file|image|document)\s+)?(.+?)(?:\s+(file|image|document))?\s+to\s+(.+)$",
+            original_command,
+            re.IGNORECASE
+        )
+
+        if not file_match:
+            return None
+
+        prefix_type = file_match.group(1)
+        file_part = file_match.group(2).strip()
+        suffix_type = file_match.group(3)
+        contact_part = file_match.group(4).strip()
+
+        # only treat as file command if explicit file-type keyword exists
+        if not (prefix_type or suffix_type):
+            return None
+
+        target = "whatsapp"
+
+        recipient_lower = contact_part.lower()
+        if " on " in recipient_lower:
+            on_index = recipient_lower.rfind(" on ")
+            explicit_target = contact_part[on_index + 4:].strip()
+            contact_part = contact_part[:on_index].strip()
+
+            normalized_target = self._normalize_platform(explicit_target)
+            if normalized_target in self.valid_platforms:
+                target = normalized_target
+
+        query = {
+            "contact_name": contact_part
+        }
+
+        # explicit path support
+        if "\\" in file_part or "/" in file_part or ":" in file_part:
+            query["file_path"] = file_part
+            query["file_name"] = file_part.split("\\")[-1].split("/")[-1]
+        else:
+            query["file_name"] = file_part
+
+        if prefix_type:
+            query["file_type"] = prefix_type.lower()
+        elif suffix_type:
+            query["file_type"] = suffix_type.lower()
+
+        return {
+            "status": "success",
+            "action": "send_file",
+            "target": target,
+            "query": query
+        }
+
     def parse(self, command: str):
         original_command = command.strip()
         lower_command = command.lower().strip()
@@ -177,6 +231,13 @@ class SimpleCommandParser:
                     "count": count
                 }
             }
+
+        # =================================================
+        # SEND FILE
+        # =================================================
+        parsed_file = self._parse_send_file_command(original_command, lower_command)
+        if parsed_file:
+            return parsed_file
 
         # =================================================
         # SEND MESSAGE

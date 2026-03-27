@@ -1,6 +1,7 @@
+import os
 import time
 from urllib.parse import quote
-
+import glob
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
@@ -234,7 +235,6 @@ class WhatsApp:
                     last_error = e
             time.sleep(0.4)
 
-
         return self._find_first_contact_result(timeout=5)
 
     def _is_chat_open(self):
@@ -277,6 +277,7 @@ class WhatsApp:
             pass
 
         return False
+
     # -------------------------------------------------
     # UNREAD MESSAGE HELPERS
     # -------------------------------------------------
@@ -323,8 +324,66 @@ class WhatsApp:
 
             time.sleep(0.4)
 
-
         return False
+
+    def _resolve_file(self, file_name=None, file_type=None):
+        user_home = os.path.expanduser("~")
+
+        search_dirs = [
+            os.path.join(user_home, "Downloads"),
+            os.path.join(user_home, "Desktop"),
+            os.path.join(user_home, "Documents"),
+        ]
+
+        candidates = []
+
+        # 🔹 1. Exact file name match
+        if file_name:
+            for folder in search_dirs:
+                for root, dirs, files in os.walk(folder):
+                    for f in files:
+                        if f.lower() == file_name.lower():
+                            return os.path.join(root, f)
+
+        # 🔹 2. Partial match (resume, loop, etc.)
+        if file_name:
+            for folder in search_dirs:
+                for root, dirs, files in os.walk(folder):
+                    for f in files:
+                        if file_name.lower() in f.lower():
+                            candidates.append(os.path.join(root, f))
+
+            if candidates:
+                return max(candidates, key=os.path.getctime)
+
+        # 🔹 3. File type (image/document/video)
+        if file_type:
+            extensions = {
+                "image": ["*.png", "*.jpg", "*.jpeg"],
+                "document": ["*.pdf", "*.docx", "*.txt"],
+                "video": ["*.mp4", "*.mkv"],
+            }
+
+            for folder in search_dirs:
+                for ext in extensions.get(file_type, []):
+                    candidates.extend(glob.glob(os.path.join(folder, "**", ext), recursive=True))
+
+            if candidates:
+                return max(candidates, key=os.path.getctime)
+
+        # 🔹 4. Latest file fallback
+        for folder in search_dirs:
+            try:
+                files = [os.path.join(folder, f) for f in os.listdir(folder)]
+                if files:
+                    candidates.extend(files)
+            except Exception:
+                continue
+
+        if candidates:
+            return max(candidates, key=os.path.getctime)
+
+        return None
 
     def _is_left_pane_candidate(self, element):
         try:
@@ -352,6 +411,131 @@ class WhatsApp:
         except Exception:
             return False
 
+    def send_file(self, query):
+        import os
+        import time
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.common.keys import Keys
+        from selenium.webdriver.common.action_chains import ActionChains
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+
+        contact_name = query.get("contact_name")
+        file_name = query.get("file_name")
+        file_path = query.get("file_path")
+
+        try:
+            bring_browser_to_front()
+
+            # LOGIN
+            if not self._is_logged_in():
+                if not self._wait_until_logged_in(timeout=60):
+                    return {"status": "error", "response": "Login required"}
+
+            # FILE RESOLVE
+            if not file_path:
+                file_path = self._resolve_file(file_name=file_name)
+
+            if not file_path or not os.path.exists(file_path):
+                return {"status": "error", "response": "File not found"}
+
+            print(f"📁 Using file: {file_path}")
+
+            # OPEN CHAT
+            if not self._open_chat_by_contact_name(contact_name):
+                return {"status": "error", "response": "Contact not found"}
+
+            time.sleep(2)
+
+            wait = WebDriverWait(self.driver, 25)
+
+            # CLICK ATTACH
+            # 🧠 FOCUS FIX
+            self.driver.execute_script("document.body.focus();")
+            time.sleep(0.5)
+
+            # CLICK ATTACH (robust)
+            attach_btn = None
+            for xpath in [
+                "//span[@data-icon='clip']",
+                "//div[@title='Attach']",
+                "//button[@title='Attach']"
+            ]:
+                try:
+                    attach_btn = WebDriverWait(self.driver, 5).until(
+                        EC.presence_of_element_located((By.XPATH, xpath))
+                    )
+                    if attach_btn.is_displayed():
+                        self.driver.execute_script("arguments[0].click();", attach_btn)
+                        break
+                except:
+                    continue
+
+            if not attach_btn:
+                return {"status": "error", "response": "Attach button not found"}
+
+            time.sleep(1.5)
+
+            # SELECT FILE INPUT (correct one)
+            file_input = WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((
+                    By.XPATH,
+                    "//input[@type='file']"
+                ))
+            )
+
+            file_input.send_keys(file_path)
+            print("✅ File attached")
+
+            # WAIT FOR PREVIEW PROPERLY
+            WebDriverWait(self.driver, 20).until(
+                EC.presence_of_element_located((
+                    By.XPATH,
+                    "//div[@role='dialog'] | //span[@data-icon='send']"
+                ))
+            )
+
+            time.sleep(2)
+
+            # CLICK SEND SAFELY
+            try:
+                send_btn = WebDriverWait(self.driver, 10).until(
+                    EC.element_to_be_clickable((By.XPATH, "//span[@data-icon='send']"))
+                )
+                self.driver.execute_script("arguments[0].click();", send_btn)
+                print("🚀 Sent via button")
+
+            except Exception:
+                print("⚠ fallback ENTER")
+                ActionChains(self.driver).send_keys(Keys.ENTER).perform()
+
+            time.sleep(2)
+            # TRY CLICK SEND
+            try:
+                send_btn = wait.until(
+                    EC.element_to_be_clickable((By.XPATH, "//span[@data-icon='send']"))
+                )
+
+                # FORCE CLICK (more stable)
+                self.driver.execute_script("arguments[0].click();", send_btn)
+                print("🚀 Sent via button")
+
+            except Exception:
+                print("⚠ Button failed → using ENTER fallback")
+                ActionChains(self.driver).send_keys(Keys.ENTER).perform()
+
+            time.sleep(2)
+
+            return {
+                "status": "success",
+                "response": f"File sent to {contact_name}"
+            }
+
+        except Exception as e:
+            return {
+                "status": "error",
+                "response": f"FAILED: {str(e)}"
+            }
     def _find_visible_chat_rows_via_xpath(self):
         selectors = [
             "//div[@role='listitem']",
@@ -377,7 +561,7 @@ class WhatsApp:
                         if not self._is_left_pane_candidate(el):
                             continue
 
-                        key = el.id
+                            key = el.id
                         if key in seen:
                             continue
 
@@ -549,7 +733,7 @@ class WhatsApp:
         except Exception:
             return ""
 
-    def _read_latest_unread_messages_from_open_chat(self, limit=2):
+    def _read_latest_unread_messages_from_open_chat(self, limit=3):
         divider_y = None
 
         divider_selectors = [
@@ -566,17 +750,13 @@ class WhatsApp:
                         break
                 if divider_y is not None:
                     break
-            except:
+            except Exception:
                 pass
 
-        # 🔥 FIX: ignore broken divider
         if divider_y == 0:
             divider_y = None
 
         incoming = self.driver.find_elements(By.XPATH, "//div[contains(@class,'message-in')]")
-
-        if not incoming:
-            return []
 
         messages = []
 
@@ -590,14 +770,14 @@ class WhatsApp:
                 text = self._extract_text_from_message_element(el)
                 if text:
                     messages.append(text)
-            except:
+            except Exception:
                 continue
 
-        # 🔥 ONLY LAST UNREAD MESSAGE
+        # ✅ RETURN MULTIPLE MESSAGES
         if messages:
-            return [messages[-1]]
+            return messages[-limit:]
 
-        # fallback → last incoming only
+        # fallback
         for el in reversed(incoming):
             text = self._extract_text_from_message_element(el)
             if text:
@@ -748,9 +928,10 @@ class WhatsApp:
                     messages = self._read_latest_unread_messages_from_open_chat()
 
                     if messages:
-                        final_output.append(f"{chat_name}: {messages[0]}")
+                        combined = " | ".join(messages)
+                        final_output.append(f"{chat_name}: {combined}")
 
-                except:
+                except Exception:
                     continue
 
             self._click_chat_filter("All", timeout=3)
@@ -766,7 +947,7 @@ class WhatsApp:
         except Exception as e:
             try:
                 self._click_chat_filter("All", timeout=2)
-            except:
+            except Exception:
                 pass
 
             return {

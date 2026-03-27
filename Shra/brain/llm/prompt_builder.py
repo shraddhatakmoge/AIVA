@@ -28,6 +28,9 @@ remove_favorite
 play_favorite
 play_last
 play_yesterday
+send_file
+read_messages
+close_browser
 
 ==================================================
 SUPPORTED TARGETS
@@ -185,6 +188,39 @@ If user says:
 
 Default target = "youtube"
 
+------------------------------
+SEND FILE / MEDIA
+------------------------------
+If user says:
+- send file report.pdf to mummy
+- send image photo.jpg to bhaya
+- send document resume.pdf to HR
+- send screenshot to mummy
+
+→ action = "send_file"
+→ target = "whatsapp"
+
+Extract:
+- "contact_name"
+- "file_path" (if explicitly mentioned)
+- "file_name"
+- "file_type" (image/document/video if possible)
+
+If file not explicitly mentioned:
+→ infer from keywords like "resume", "screenshot", "photo"
+
+------------------------------
+READ MESSAGES
+------------------------------
+If user says:
+- read messages
+- read unread messages
+- read messages from mummy
+- read last 5 messages from bhaya
+
+→ action = "read_messages"
+→ target = "whatsapp"
+
 ==================================================
 CRITICAL CONSTRAINTS
 ==================================================
@@ -196,8 +232,6 @@ CRITICAL CONSTRAINTS
 5. NEVER return play_music without query or mood.
 6. If action does not require query, do not include it.
 7. Always return STRICT JSON only.
-
-==================================================
 
 User command:
 {command}
