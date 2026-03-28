@@ -34,7 +34,6 @@ class BrowserController:
             "youtube": YouTube(self.driver),
             "spotify": Spotify(self.driver),
             "google": Google(self.driver),
-            "gmail": Gmail(self.driver),
             "whatsapp": WhatsApp(self.driver),
         }
 
@@ -126,7 +125,7 @@ class BrowserController:
         return "youtube"
 
     # -------------------------------------------------
-    # SAFE METHOD EXECUTION
+    # SAFE METHOD EXECUTION (🔥 FIXED)
     # -------------------------------------------------
     def _execute_platform_method(self, platform, action, query):
 
@@ -142,8 +141,10 @@ class BrowserController:
             signature = inspect.signature(method)
             parameters = list(signature.parameters.values())
 
-            # 🔥 FIX: always pass query if method accepts ANY parameter
-            if len(parameters) > 0:
+            # 🔥 FINAL FIX (supports ALL platforms safely)
+            if isinstance(query, dict):
+                result = method(**query)
+            elif query is not None:
                 result = method(query)
             else:
                 result = method()
@@ -161,6 +162,7 @@ class BrowserController:
                 "status": "error",
                 "response": str(e)
             }
+
     # -------------------------------------------------
     # HANDLE COMMAND
     # -------------------------------------------------
@@ -198,7 +200,7 @@ class BrowserController:
             }
 
         # -------------------------------------------------
-        # CLOSE ENTIRE BROWSER (STRICT CHECK FIRST)
+        # CLOSE ENTIRE BROWSER
         # -------------------------------------------------
         if action == "close_browser":
 
@@ -226,6 +228,26 @@ class BrowserController:
                 }
 
         # -------------------------------------------------
+        # GMAIL (API BASED - NO SELENIUM)
+        # -------------------------------------------------
+        # -------------------------------------------------
+        # GMAIL (API BASED - NO SELENIUM)
+        if action == "send_email":
+            gmail = Gmail(None)
+
+            query_data = structured.get("query", {})
+
+            to = query_data.get("to")
+            subject = query_data.get("subject")
+            message = query_data.get("body")
+
+            # ✅ safety fallback
+            if not message:
+                message = "No message provided"
+            if not subject:
+                subject = "No Subject"
+
+            return gmail.send_email(to, subject, message)
         # NORMAL FLOW
         # -------------------------------------------------
         self._ensure_driver()

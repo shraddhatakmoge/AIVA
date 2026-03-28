@@ -1,35 +1,70 @@
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from AIVA.Shra.features.browser.window_focus import bring_browser_to_front
+import base64
+from email.mime.text import MIMEText
+from googleapiclient.discovery import build
+from google_auth_oauthlib.flow import InstalledAppFlow
+import pickle
+import os
 
 
 class Gmail:
 
     def __init__(self, driver):
         self.driver = driver
+        self.service = self.authenticate()
 
-    def get_url(self):
-        return "https://mail.google.com"
+    def authenticate(self):
+        SCOPES = ['https://www.googleapis.com/auth/gmail.send']
 
-    def _is_logged_in(self):
+        # 🔥 Get ROOT directory (AIVA-shra)
+        BASE_DIR = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "../../../../..")
+        )
+
+        cred_path = os.path.join(BASE_DIR, "credentials.json")
+        token_path = os.path.join(BASE_DIR, "token.pickle")
+
+        creds = None
+
+        # Load token if exists
+        if os.path.exists(token_path):
+            with open(token_path, 'rb') as token:
+                creds = pickle.load(token)
+
+        # First-time login
+        if not creds:
+            flow = InstalledAppFlow.from_client_secrets_file(
+                cred_path, SCOPES
+            )
+            creds = flow.run_local_server(
+                port=0,
+                open_browser=True
+            )
+
+            with open(token_path, 'wb') as token:
+                pickle.dump(creds, token)
+
+        return build('gmail', 'v1', credentials=creds)
+
+    def send_email(self, to, subject, body):
         try:
-            self.driver.find_element(By.XPATH, "//div[text()='Compose']")
-            return True
-        except:
-            return False
+            message = MIMEText(body)
+            message['to'] = to
+            message['subject'] = subject
 
-    def open(self):
-        self.driver.get(self.get_url())
-        bring_browser_to_front()
+            raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
 
-        if not self._is_logged_in():
+            self.service.users().messages().send(
+                userId='me',
+                body={'raw': raw}
+            ).execute()
+
             return {
-                "status": "login_required",
-                "response": "Please login to Gmail once."
+                "status": "success",
+                "response": f"Email sent to {to}"
             }
 
-        return {
-            "status": "success",
-            "response": "Opened Gmail"
-        }
+        except Exception as e:
+            return {
+                "status": "error",
+                "response": str(e)
+            }

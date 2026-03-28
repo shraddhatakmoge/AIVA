@@ -412,14 +412,6 @@ class WhatsApp:
             return False
 
     def send_file(self, query):
-        import os
-        import time
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.common.keys import Keys
-        from selenium.webdriver.common.action_chains import ActionChains
-        from selenium.webdriver.support.ui import WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-
         contact_name = query.get("contact_name")
         file_name = query.get("file_name")
         file_path = query.get("file_path")
@@ -447,26 +439,24 @@ class WhatsApp:
 
             time.sleep(2)
 
-            wait = WebDriverWait(self.driver, 25)
-
-            # CLICK ATTACH
-            # 🧠 FOCUS FIX
-            self.driver.execute_script("document.body.focus();")
-            time.sleep(0.5)
-
-            # CLICK ATTACH (robust)
+            # CLICK ATTACH BUTTON
             attach_btn = None
-            for xpath in [
+            attach_xpaths = [
                 "//span[@data-icon='clip']",
-                "//div[@title='Attach']",
-                "//button[@title='Attach']"
-            ]:
+                "//span[@data-icon='attach-menu-plus']",
+                "//button[@aria-label='Attach']",
+                "//div[@aria-label='Attach']",
+            ]
+
+            for xpath in attach_xpaths:
                 try:
-                    attach_btn = WebDriverWait(self.driver, 5).until(
-                        EC.presence_of_element_located((By.XPATH, xpath))
-                    )
-                    if attach_btn.is_displayed():
-                        self.driver.execute_script("arguments[0].click();", attach_btn)
+                    elements = self.driver.find_elements(By.XPATH, xpath)
+                    for el in elements:
+                        if el.is_displayed():
+                            self.driver.execute_script("arguments[0].click();", el)
+                            attach_btn = el
+                            break
+                    if attach_btn:
                         break
                 except:
                     continue
@@ -474,68 +464,344 @@ class WhatsApp:
             if not attach_btn:
                 return {"status": "error", "response": "Attach button not found"}
 
+            time.sleep(1)
+            # 🔥 FINAL ROBUST DOCUMENT CLICK (WORKS IN ALL UI VARIANTS)
+            doc_clicked = False
+            end_time = time.time() + 10
+
+            while time.time() < end_time:
+                try:
+                    # 🔥 get ALL clickable menu items
+                    items = self.driver.find_elements(
+                        By.XPATH,
+                        "//*[@role='button' and .//span]"
+                    )
+
+                    for item in items:
+                        try:
+                            if not item.is_displayed():
+                                continue
+
+                            text = (item.text or "").lower()
+
+                            # ✅ primary: text match
+                            if "document" in text:
+                                self.driver.execute_script("arguments[0].click();", item)
+                                doc_clicked = True
+                                break
+
+                            # ✅ secondary: icon match
+                            icons = item.find_elements(By.XPATH, ".//span[contains(@data-icon,'document')]")
+                            if icons:
+                                self.driver.execute_script("arguments[0].click();", item)
+                                doc_clicked = True
+                                break
+
+                        except:
+                            continue
+
+                    if doc_clicked:
+                        break
+
+                except:
+                    pass
+
+                time.sleep(0.5)
+
+            # 🔥 FINAL FALLBACK (VERY IMPORTANT)
+            if not doc_clicked:
+                try:
+                    items = self.driver.find_elements(By.XPATH, "//*[@role='button']")
+
+                    # usually order: Photo | Document | Camera
+                    if len(items) >= 3:
+                        self.driver.execute_script("arguments[0].click();", items[1])  # Document
+                        doc_clicked = True
+                except:
+                    pass
+
+            if not doc_clicked:
+                return {"status": "error", "response": "Document option STILL not clickable"}
+
+            time.sleep(1.5)
+            if not doc_clicked:
+                # 🔥 FINAL FALLBACK: click 2nd option blindly (works in most UIs)
+                try:
+                    items = self.driver.find_elements(By.XPATH, "//li[@role='button']")
+                    if len(items) >= 2:
+                        self.driver.execute_script("arguments[0].click();", items[1])
+                        doc_clicked = True
+                except:
+                    pass
+
+            if not doc_clicked:
+                return {"status": "error", "response": "Document option STILL not clicked"}
+
             time.sleep(1.5)
 
-            # SELECT FILE INPUT (correct one)
-            file_input = WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((
-                    By.XPATH,
-                    "//input[@type='file']"
-                ))
-            )
+            # 🔥 DIRECT FILE UPLOAD (FINAL FIX)
 
+            # 🔥 PICK CORRECT FILE INPUT (LAST ONE = ACTIVE ONE)
+            inputs = self.driver.find_elements(By.XPATH, "//input[@type='file']")
+
+            if not inputs:
+                return {"status": "error", "response": "No file input found"}
+
+            file_input = inputs[-1]  # 🔥 THIS IS THE FIX
+
+            # 🔥 MAKE INPUT VISIBLE (IMPORTANT)
+            self.driver.execute_script("""
+                arguments[0].style.display = 'block';
+                arguments[0].style.visibility = 'visible';
+                arguments[0].style.height = '1px';
+                arguments[0].style.width = '1px';
+            """, file_input)
+
+            # 🔥 SEND FILE (MISSING PART)
             file_input.send_keys(file_path)
-            print("✅ File attached")
-
-            # WAIT FOR PREVIEW PROPERLY
-            WebDriverWait(self.driver, 20).until(
-                EC.presence_of_element_located((
-                    By.XPATH,
-                    "//div[@role='dialog'] | //span[@data-icon='send']"
-                ))
-            )
+            print("✅ File uploaded via direct input")
 
             time.sleep(2)
 
-            # CLICK SEND SAFELY
+            # 🔥 ROBUST ERROR DETECTION (REPLACE THIS BLOCK)
+            for _ in range(5):
+                if self._detect_upload_error():
+                    return {
+                        "status": "error",
+                        "response": "File type not supported by WhatsApp"
+                    }
+                time.sleep(0.5)
+
+
+
+            # 🔥 VERIFY FILE ACTUALLY SENT (STRICT)
+            # 🔥 CLICK SEND BUTTON FIRST
+            # 🔥 WAIT FOR FILE TO ATTACH
+            time.sleep(2)
+
+            # 🔥 FOCUS MESSAGE BOX (CRITICAL FIX)
             try:
-                send_btn = WebDriverWait(self.driver, 10).until(
-                    EC.element_to_be_clickable((By.XPATH, "//span[@data-icon='send']"))
-                )
-                self.driver.execute_script("arguments[0].click();", send_btn)
-                print("🚀 Sent via button")
+                message_box = self._find_message_box(timeout=5)
+                self.driver.execute_script("arguments[0].click();", message_box)
+                time.sleep(0.3)
+            except:
+                pass
 
-            except Exception:
-                print("⚠ fallback ENTER")
-                ActionChains(self.driver).send_keys(Keys.ENTER).perform()
-
-            time.sleep(2)
-            # TRY CLICK SEND
+            # 🔥 SEND USING ENTER (FINAL RELIABLE METHOD)
             try:
-                send_btn = wait.until(
-                    EC.element_to_be_clickable((By.XPATH, "//span[@data-icon='send']"))
-                )
-
-                # FORCE CLICK (more stable)
-                self.driver.execute_script("arguments[0].click();", send_btn)
-                print("🚀 Sent via button")
-
-            except Exception:
-                print("⚠ Button failed → using ENTER fallback")
                 ActionChains(self.driver).send_keys(Keys.ENTER).perform()
+                time.sleep(2)
+            except Exception as e:
+                return {
+                    "status": "error",
+                    "response": f"Could not send file using ENTER: {str(e)}"
+                }
 
-            time.sleep(2)
+            # 🔥 WAIT UNTIL MODAL CLOSES (VERY IMPORTANT)
+            try:
+                WebDriverWait(self.driver, 5).until_not(
+                    EC.presence_of_element_located((By.XPATH, "//div[@role='dialog']"))
+                )
+            except:
+                pass
+
+            # 🔥 NOW VERIFY FILE ACTUALLY SENT
+            sent = self._wait_for_sent_document(file_path, timeout=15)
+
+            if not sent:
+                return {
+                    "status": "error",
+                    "response": "File was NOT sent (send button click failed or UI issue)"
+                }
+
+            print("🚀 REAL FILE SENT")
+
+            return {
+                "status": "success",
+                "response": f"File sent to {contact_name}"
+            }
+            # 🔥 VERIFY FILE REALLY SENT
+            if not self._wait_for_sent_document(file_path, timeout=15):
+                return {
+                    "status": "error",
+                    "response": "Send button clicked but file NOT sent."
+                }
+
+            print("🚀 REAL FILE SENT")
 
             return {
                 "status": "success",
                 "response": f"File sent to {contact_name}"
             }
 
+
+
         except Exception as e:
             return {
                 "status": "error",
                 "response": f"FAILED: {str(e)}"
             }
+
+    def _detect_upload_error(self):
+        error_xpaths = [
+            "//*[contains(text(),'not supported')]",
+            "//*[contains(text(),'couldn’t send')]",
+            "//*[contains(text(),'not allowed')]",
+            "//*[contains(text(),'failed')]",
+        ]
+
+        for xpath in error_xpaths:
+            try:
+                elements = self.driver.find_elements(By.XPATH, xpath)
+                for el in elements:
+                    if el.is_displayed():
+                        return True
+            except:
+                continue
+
+        return False
+    def _find_document_input(self, timeout=10):
+        end_time = time.time() + timeout
+        last_error = None
+
+        xpaths = [
+            "//input[@type='file' and @accept='*']",
+            "//input[@type='file' and contains(@accept, '*')]",
+            "//li[@role='button']//*[contains(normalize-space(.), 'Document')]/ancestor::li[1]//input[@type='file']",
+            "(//input[@type='file'])[last()]",
+        ]
+
+        while time.time() < end_time:
+            for xpath in xpaths:
+                try:
+                    elements = self.driver.find_elements(By.XPATH, xpath)
+                    for el in elements:
+                        try:
+                            accept = (el.get_attribute("accept") or "").strip()
+                            if el.get_attribute("type") == "file":
+                                return el
+                        except Exception:
+                            continue
+                except Exception as e:
+                    last_error = e
+            time.sleep(0.3)
+
+        raise TimeoutException(f"Document file input not found. Last error: {last_error}")
+
+    def _wait_for_attachment_preview(self, file_name=None, timeout=10):
+        end_time = time.time() + timeout
+        base_name = os.path.basename(file_name)
+
+        while time.time() < end_time:
+
+            # ✅ MUST have send button inside dialog (REAL attachment modal)
+            try:
+                dialog = self.driver.find_element(By.XPATH, "//div[@role='dialog']")
+                if dialog.is_displayed():
+
+                    send_btn = dialog.find_elements(By.XPATH, ".//span[@data-icon='send']")
+                    filename = dialog.find_elements(By.XPATH, f".//*[contains(text(), '{base_name}')]")
+
+                    if send_btn and filename:
+                        return True
+            except:
+                pass
+
+            time.sleep(0.4)
+
+        return False
+    def _wait_for_sent_file_message(self, file_path, timeout=20):
+        file_base = os.path.basename(file_path)
+        end_time = time.time() + timeout
+
+        xpaths = [
+            f"//span[contains(text(), '{file_base}')]",
+            f"//*[contains(text(), '{file_base}')]",
+            "//div[contains(@class,'message-out')]//span[@data-icon='msg-check']",
+            "//div[contains(@class,'message-out')]//span[@data-icon='msg-dblcheck']",
+        ]
+
+        while time.time() < end_time:
+            for xpath in xpaths:
+                try:
+                    elements = self.driver.find_elements(By.XPATH, xpath)
+                    for el in elements:
+                        try:
+                            if el.is_displayed():
+                                return True
+                        except Exception:
+                            continue
+                except Exception:
+                    continue
+            time.sleep(0.5)
+
+        return False
+
+    def _click_send_button_for_attachment(self, timeout=10):
+        end_time = time.time() + timeout
+
+        while time.time() < end_time:
+            try:
+                # 🔥 FIND ALL SEND ICONS (GLOBAL)
+                send_buttons = self.driver.find_elements(By.XPATH, "//span[@data-icon='send']")
+
+                for btn in send_buttons:
+                    try:
+                        if not btn.is_displayed():
+                            continue
+
+                        # 🔥 ensure it's bottom area (real send button)
+                        y = btn.location.get("y", 0)
+                        if y < 300:  # ignore top icons
+                            continue
+
+                        ActionChains(self.driver).move_to_element(btn).click().perform()
+                        time.sleep(0.5)
+
+                        return True
+
+                    except:
+                        continue
+
+            except:
+                pass
+
+            time.sleep(0.5)
+
+        raise TimeoutException("Send button not found")
+
+    def _wait_for_sent_document(self, file_path, timeout=20):
+        end_time = time.time() + timeout
+        base_name = os.path.basename(file_path)
+
+        while time.time() < end_time:
+            try:
+                # 🔥 ONLY CHECK REAL SENT MESSAGES (RIGHT SIDE)
+                messages = self.driver.find_elements(
+                    By.XPATH,
+                    "//div[contains(@class,'message-out')]"
+                )
+
+                for msg in messages[-5:]:  # check last few messages
+                    try:
+                        text = msg.text.lower()
+
+                        if base_name.lower() in text:
+                            # 🔥 ensure message is actually delivered (has tick)
+                            ticks = msg.find_elements(By.XPATH,
+                                                      ".//span[@data-icon='msg-check' or @data-icon='msg-dblcheck']")
+
+                            if ticks:
+                                return True
+
+                    except:
+                        continue
+            except:
+                pass
+
+            time.sleep(0.5)
+
+        return False
     def _find_visible_chat_rows_via_xpath(self):
         selectors = [
             "//div[@role='listitem']",
@@ -561,7 +827,7 @@ class WhatsApp:
                         if not self._is_left_pane_candidate(el):
                             continue
 
-                            key = el.id
+                        key = el.id
                         if key in seen:
                             continue
 

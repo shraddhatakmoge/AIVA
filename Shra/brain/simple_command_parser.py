@@ -49,7 +49,6 @@ class SimpleCommandParser:
         suffix_type = file_match.group(3)
         contact_part = file_match.group(4).strip()
 
-        # only treat as file command if explicit file-type keyword exists
         if not (prefix_type or suffix_type):
             return None
 
@@ -69,7 +68,6 @@ class SimpleCommandParser:
             "contact_name": contact_part
         }
 
-        # explicit path support
         if "\\" in file_part or "/" in file_part or ":" in file_part:
             query["file_path"] = file_part
             query["file_name"] = file_part.split("\\")[-1].split("/")[-1]
@@ -92,9 +90,6 @@ class SimpleCommandParser:
         original_command = command.strip()
         lower_command = command.lower().strip()
 
-        # =================================================
-        # MULTI INTENT COMMANDS
-        # =================================================
         if " and " in lower_command:
             parts = [p.strip() for p in original_command.split(" and ")]
             actions = []
@@ -110,18 +105,12 @@ class SimpleCommandParser:
                     "actions": actions
                 }
 
-        # =================================================
-        # CLOSE ENTIRE BROWSER
-        # =================================================
         if lower_command in ["close browser", "exit browser", "shutdown browser"]:
             return {
                 "status": "success",
                 "action": "close_browser"
             }
 
-        # =================================================
-        # CONTEXTUAL FAVORITE COMMANDS
-        # =================================================
         if "add this" in lower_command and "favorite" in lower_command:
             return {
                 "status": "success",
@@ -146,9 +135,6 @@ class SimpleCommandParser:
                 "action": "play_yesterday"
             }
 
-        # =================================================
-        # OPEN
-        # =================================================
         if lower_command.startswith("open "):
             target = lower_command.replace("open ", "", 1).strip()
             target = self._normalize_platform(target)
@@ -159,9 +145,6 @@ class SimpleCommandParser:
                 "target": target
             }
 
-        # =================================================
-        # READ MESSAGES
-        # =================================================
         if lower_command in [
             "read me my messages",
             "read my messages",
@@ -232,16 +215,32 @@ class SimpleCommandParser:
                 }
             }
 
-        # =================================================
-        # SEND FILE
-        # =================================================
+        if lower_command.startswith("send email"):
+            match = re.match(r"send email to (.+?) subject (.+?) message (.+)", lower_command)
+
+            if match:
+                return {
+                    "status": "success",
+                    "action": "send_email",
+                    "target": "gmail",
+                    "query": {
+                        "to": match.group(1),
+                        "subject": match.group(2),
+                        "body": match.group(3)
+                    }
+                }
+
+        if lower_command in ["read my email", "read latest email", "read gmail"]:
+            return {
+                "status": "success",
+                "action": "read_latest_email",
+                "target": "gmail"
+            }
+
         parsed_file = self._parse_send_file_command(original_command, lower_command)
         if parsed_file:
             return parsed_file
 
-        # =================================================
-        # SEND MESSAGE
-        # =================================================
         for prefix in ["send message ", "send "]:
             if lower_command.startswith(prefix):
                 remaining_original = original_command[len(prefix):].strip()
@@ -283,9 +282,6 @@ class SimpleCommandParser:
                         "query": query
                     }
 
-        # =================================================
-        # SEARCH
-        # =================================================
         for prefix in ["search ", "seach ", "serch ", "sarch "]:
             if lower_command.startswith(prefix):
                 remaining = lower_command[len(prefix):].strip()
@@ -308,9 +304,6 @@ class SimpleCommandParser:
                     "query": remaining
                 }
 
-        # =================================================
-        # PLAY
-        # =================================================
         if lower_command.startswith("play "):
             remaining = lower_command.replace("play ", "", 1).strip()
 
@@ -340,9 +333,6 @@ class SimpleCommandParser:
                 "query": remaining
             }
 
-        # =================================================
-        # CLOSE TAB
-        # =================================================
         if lower_command.startswith("close "):
             target = lower_command.replace("close ", "", 1).strip()
             target = self._normalize_platform(target)
