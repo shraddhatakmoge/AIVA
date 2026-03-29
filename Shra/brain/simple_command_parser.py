@@ -215,20 +215,68 @@ class SimpleCommandParser:
                 }
             }
 
-        if lower_command.startswith("send email"):
-            match = re.match(r"send email to (.+?) subject (.+?) message (.+)", lower_command)
+        # =====================================================
+        # 🔥 IMPROVED EMAIL PARSING (DO NOT TOUCH REST)
+        # =====================================================
+        if "send email" in lower_command or "send mail" in lower_command:
 
-            if match:
+            to = None
+            subject = None
+            body = None
+
+            # Extract email OR name
+            email_match = re.search(r"[\w\.-]+@[\w\.-]+", lower_command)
+
+            if email_match:
+                to = email_match.group(0)
+            else:
+                # 🔥 fallback: extract after "to"
+                if " to " in lower_command:
+                    to_part = lower_command.split(" to ", 1)[1]
+
+                    # stop at subject/message if present
+                    for stop_word in ["subject", "message"]:
+                        if stop_word in to_part:
+                            to_part = to_part.split(stop_word)[0]
+
+                    to = to_part.strip().split()[0]
+            # Extract subject
+            if "subject" in lower_command:
+                subject_part = lower_command.split("subject", 1)[1]
+                if "message" in subject_part:
+                    subject = subject_part.split("message")[0].strip()
+                else:
+                    subject = subject_part.strip()
+
+            # Extract body/message
+            if "message" in lower_command:
+                body = lower_command.split("message", 1)[1].strip()
+
+            # Fallbacks
+            if not subject:
+                subject = "No Subject"
+
+            if not body:
+                # If user didn't say "message", take remaining text after email
+                if to:
+                    parts = lower_command.split(to)
+                    if len(parts) > 1:
+                        body = parts[1].replace("subject", "").strip()
+                if not body:
+                    body = "No message provided"
+
+            if to:
                 return {
                     "status": "success",
                     "action": "send_email",
                     "target": "gmail",
                     "query": {
-                        "to": match.group(1),
-                        "subject": match.group(2),
-                        "body": match.group(3)
+                        "to": to,
+                        "subject": subject,
+                        "body": body
                     }
                 }
+        # =====================================================
 
         if lower_command in ["read my email", "read latest email", "read gmail"]:
             return {

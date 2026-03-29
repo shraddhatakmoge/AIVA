@@ -16,6 +16,7 @@ class BrowserController:
         self.platform_instances = {}
         self.tabs = {}
         self.last_active_platform = None
+        self.pending_email = None
 
     # -------------------------------------------------
     # ENSURE DRIVER
@@ -125,7 +126,7 @@ class BrowserController:
         return "youtube"
 
     # -------------------------------------------------
-    # SAFE METHOD EXECUTION (🔥 FIXED)
+    # SAFE METHOD EXECUTION
     # -------------------------------------------------
     def _execute_platform_method(self, platform, action, query):
 
@@ -138,12 +139,12 @@ class BrowserController:
         method = getattr(platform, action)
 
         try:
-            signature = inspect.signature(method)
-            parameters = list(signature.parameters.values())
-
-            # 🔥 FINAL FIX (supports ALL platforms safely)
             if isinstance(query, dict):
-                result = method(**query)
+                # 🔥 SPECIAL CASE FOR WHATSAPP
+                if platform.__class__.__name__ == "WhatsApp":
+                    result = method(query)
+                else:
+                    result = method(**query)
             elif query is not None:
                 result = method(query)
             else:
@@ -168,19 +169,40 @@ class BrowserController:
     # -------------------------------------------------
     def handle(self, structured):
 
+        # 🔥 VOICE FOLLOW-UP HANDLER
+        if self.pending_email:
+
+            user_input = structured.get("query") or structured.get("message") or ""
+
+            if isinstance(user_input, dict):
+                user_input = str(user_input)
+
+            if "@" in user_input:
+                to_email = user_input.strip()
+
+                subject = self.pending_email.get("subject")
+                body = self.pending_email.get("body")
+
+                self.pending_email = None
+
+                gmail = Gmail(None)
+                return gmail.send_email(to_email, subject, body)
+
+            else:
+                return {
+                    "status": "ask",
+                    "response": "That doesn't look like an email. Please say a valid email address."
+                }
+
         if not structured:
             return {
                 "status": "error",
                 "response": "Invalid command structure."
             }
 
-        # -------------------------------------------------
         # MULTI ACTION SUPPORT
-        # -------------------------------------------------
         if "actions" in structured:
-
             results = []
-
             for act in structured["actions"]:
                 result = self.handle(act)
                 results.append(result)
@@ -199,17 +221,11 @@ class BrowserController:
                 "response": "No action provided."
             }
 
-        # -------------------------------------------------
+        # 🔥 FIX 1: TARGET WAS MISSING
+        target = self._detect_target(structured)
+
         # CLOSE ENTIRE BROWSER
-        # -------------------------------------------------
         if action == "close_browser":
-
-            if not self.driver:
-                return {
-                    "status": "error",
-                    "response": "No active browser session."
-                }
-
             try:
                 self.driver.quit()
                 self.driver = None
@@ -220,18 +236,13 @@ class BrowserController:
                     "status": "success",
                     "response": "Closed entire browser session."
                 }
-
             except Exception as e:
                 return {
                     "status": "error",
-                    "response": f"Failed to close browser: {str(e)}"
+                    "response": str(e)
                 }
 
-        # -------------------------------------------------
-        # GMAIL (API BASED - NO SELENIUM)
-        # -------------------------------------------------
-        # -------------------------------------------------
-        # GMAIL (API BASED - NO SELENIUM)
+        # GMAIL SEND
         if action == "send_email":
             gmail = Gmail(None)
 
@@ -241,18 +252,45 @@ class BrowserController:
             subject = query_data.get("subject")
             message = query_data.get("body")
 
-            # ✅ safety fallback
+            from contacts import CONTACTS
+
+            if to:
+                to_clean = to.strip().lower()
+
+                if to_clean in CONTACTS:
+                    to = CONTACTS[to_clean]
+
+                elif "@" not in to:
+                    self.pending_email = {
+                        "to_name": to_clean,
+                        "subject": subject,
+                        "body": message
+                    }
+
+                    return {
+                        "status": "ask",
+                        "response": f"I don't know {to}. Please tell me the email."
+                    }
+
             if not message:
                 message = "No message provided"
             if not subject:
                 subject = "No Subject"
 
             return gmail.send_email(to, subject, message)
-        # NORMAL FLOW
-        # -------------------------------------------------
-        self._ensure_driver()
 
-        target = self._detect_target(structured)
+        # 🔥 FIX 2: GMAIL OPEN (ADDED — SAFE)
+        if action == "open" and structured.get("target") in ["gmail", "mail"]:
+            import webbrowser
+            webbrowser.open("https://mail.google.com")
+
+            return {
+                "status": "success",
+                "response": "Opened Gmail"
+            }
+
+        # NORMAL FLOW
+        self._ensure_driver()
 
         if target not in self.platform_instances:
             return {
@@ -263,11 +301,8 @@ class BrowserController:
         action = self._normalize_action(action)
         platform = self.platform_instances[target]
 
-        # -------------------------------------------------
         # OPEN
-        # -------------------------------------------------
         if action == "open":
-
             if target in self.tabs and self._switch_to_tab(target):
                 return {
                     "status": "success",
@@ -276,11 +311,8 @@ class BrowserController:
 
             return self._open_new_tab(target)
 
-        # -------------------------------------------------
         # CLOSE TAB
-        # -------------------------------------------------
         if action == "close":
-
             if target in self.tabs:
                 try:
                     self._switch_to_tab(target)
@@ -316,9 +348,7 @@ class BrowserController:
                 "response": f"{target.capitalize()} is not open."
             }
 
-        # -------------------------------------------------
         # AUTO OPEN
-        # -------------------------------------------------
         if target not in self.tabs:
             open_result = self._open_new_tab(target)
             if open_result.get("status") not in ["success", "login_required"]:
@@ -326,9 +356,7 @@ class BrowserController:
         else:
             self._switch_to_tab(target)
 
-        # -------------------------------------------------
-        # EXECUTE ACTION
-        # -------------------------------------------------
+        # EXECUTE
         result = self._execute_platform_method(platform, action, query)
 
         if result.get("status") == "success":
