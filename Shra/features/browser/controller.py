@@ -140,7 +140,6 @@ class BrowserController:
 
         try:
             if isinstance(query, dict):
-                # 🔥 SPECIAL CASE FOR WHATSAPP
                 if platform.__class__.__name__ == "WhatsApp":
                     result = method(query)
                 else:
@@ -169,7 +168,7 @@ class BrowserController:
     # -------------------------------------------------
     def handle(self, structured):
 
-        # 🔥 VOICE FOLLOW-UP HANDLER
+        # 🔥 MULTI-STEP EMAIL FLOW (FIXED)
         if self.pending_email:
 
             user_input = structured.get("query") or structured.get("message") or ""
@@ -177,22 +176,36 @@ class BrowserController:
             if isinstance(user_input, dict):
                 user_input = str(user_input)
 
-            if "@" in user_input:
-                to_email = user_input.strip()
+            user_input = user_input.strip()
 
-                subject = self.pending_email.get("subject")
-                body = self.pending_email.get("body")
+            step = self.pending_email.get("step")
+
+            # EMAIL STEP
+            if step == "email":
+                self.pending_email["to"] = user_input
+                self.pending_email["step"] = "subject"
+                return {"status": "ask", "response": "What should be the subject?"}
+
+            # SUBJECT STEP
+            if step == "subject":
+                self.pending_email["subject"] = user_input
+                self.pending_email["step"] = "body"
+                return {"status": "ask", "response": "What should I write in the email?"}
+
+            # BODY STEP
+            if step == "body":
+                self.pending_email["body"] = user_input
+
+                gmail = Gmail(None)
+
+                to = self.pending_email["to"]
+                subject = self.pending_email["subject"]
+                body = self.pending_email["body"]
 
                 self.pending_email = None
 
-                gmail = Gmail(None)
-                return gmail.send_email(to_email, subject, body)
+                return gmail.send_email(to, subject, body)
 
-            else:
-                return {
-                    "status": "ask",
-                    "response": "That doesn't look like an email. Please say a valid email address."
-                }
 
         if not structured:
             return {
@@ -221,7 +234,6 @@ class BrowserController:
                 "response": "No action provided."
             }
 
-        # 🔥 FIX 1: TARGET WAS MISSING
         target = self._detect_target(structured)
 
         # CLOSE ENTIRE BROWSER
@@ -242,15 +254,12 @@ class BrowserController:
                     "response": str(e)
                 }
 
-        # GMAIL SEND
+        # 🔥 UPDATED EMAIL ENTRY POINT
         if action == "send_email":
-            gmail = Gmail(None)
 
             query_data = structured.get("query", {})
 
             to = query_data.get("to")
-            subject = query_data.get("subject")
-            message = query_data.get("body")
 
             from contacts import CONTACTS
 
@@ -262,24 +271,30 @@ class BrowserController:
 
                 elif "@" not in to:
                     self.pending_email = {
-                        "to_name": to_clean,
-                        "subject": subject,
-                        "body": message
+                        "to": None,
+                        "subject": None,
+                        "body": None,
+                        "step": "email"
                     }
-
                     return {
                         "status": "ask",
                         "response": f"I don't know {to}. Please tell me the email."
                     }
 
-            if not message:
-                message = "No message provided"
-            if not subject:
-                subject = "No Subject"
+            # 🔥 START FLOW
+            self.pending_email = {
+                "to": to,
+                "subject": None,
+                "body": None,
+                "step": "subject"
+            }
 
-            return gmail.send_email(to, subject, message)
+            return {
+                "status": "ask",
+                "response": "What should be the subject?"
+            }
 
-        # 🔥 FIX 2: GMAIL OPEN (ADDED — SAFE)
+        # GMAIL OPEN
         if action == "open" and structured.get("target") in ["gmail", "mail"]:
             import webbrowser
             webbrowser.open("https://mail.google.com")
@@ -318,19 +333,6 @@ class BrowserController:
                     self._switch_to_tab(target)
                     self.driver.close()
                     self.tabs.pop(target, None)
-
-                    remaining_handles = self.driver.window_handles
-
-                    if remaining_handles:
-                        self.driver.switch_to.window(remaining_handles[0])
-                        bring_browser_to_front()
-
-                        for name, handle in self.tabs.items():
-                            if handle == remaining_handles[0]:
-                                self.last_active_platform = name
-                                break
-                    else:
-                        self.last_active_platform = None
 
                     return {
                         "status": "success",

@@ -1,5 +1,6 @@
 import base64
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 import pickle
@@ -47,9 +48,13 @@ class Gmail:
 
     def send_email(self, to, subject, body):
         try:
-            message = MIMEText(body)
+            # 🔥 Using multipart (future-ready for attachments)
+            message = MIMEMultipart()
             message['to'] = to
             message['subject'] = subject
+
+            # Body
+            message.attach(MIMEText(body))
 
             raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
 

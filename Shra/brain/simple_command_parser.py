@@ -254,16 +254,19 @@ class SimpleCommandParser:
 
             # Fallbacks
             if not subject:
-                subject = "No Subject"
+                subject = None
 
             if not body:
-                # If user didn't say "message", take remaining text after email
+                # Try extracting loose text as body
                 if to:
                     parts = lower_command.split(to)
                     if len(parts) > 1:
-                        body = parts[1].replace("subject", "").strip()
+                        possible_body = parts[1].replace("subject", "").strip()
+                        if possible_body:
+                            body = possible_body
+
                 if not body:
-                    body = "No message provided"
+                    body = None
 
             if to:
                 return {

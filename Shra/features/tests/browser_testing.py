@@ -16,25 +16,29 @@ router = Router()
 browser = BrowserController()
 simple_parser = SimpleCommandParser()
 
-
 while True:
 
-    command = input("Enter command: ")
+    command = input("You: ")
 
     if command.lower() in ["exit", "quit"]:
         break
 
-    # -------------------------------------------------
-    # STEP 1 — Rule-based parsing first
-    # -------------------------------------------------
+    # 🔥 EMAIL FLOW FIRST
+    if browser.pending_email:
+        result = browser.handle({
+            "action": "continue_email",
+            "query": command
+        })
+
+        print("Assistant:", result["response"])
+        continue
+
+    # ---------------- NORMAL FLOW ----------------
     simple_result = simple_parser.parse(command)
 
     if simple_result:
         structured = simple_result
     else:
-        # -------------------------------------------------
-        # STEP 2 — Use LLM for complex commands
-        # -------------------------------------------------
         prompt = prompt_builder.build(command, memory.get_context())
         raw_response = llm.generate(prompt)
 
@@ -45,21 +49,9 @@ while True:
         parsed = parser.parse(raw_response)
         structured = router.route(parsed)
 
-    # -------------------------------------------------
-    # If router returned error
-    # -------------------------------------------------
-    if structured.get("status") == "error":
-        print(structured)
-        continue
-
-    # -------------------------------------------------
-    # 🔥 CRITICAL ADDITION — Attach Original Command
-    # -------------------------------------------------
     structured["original_command"] = command
 
-    # -------------------------------------------------
-    # Execute command
-    # -------------------------------------------------
+    # 🔥 THIS WAS MISSING / WRONG IN YOUR CODE
     result = browser.handle(structured)
 
-    print(result)
+    print("Assistant:", result["response"])
