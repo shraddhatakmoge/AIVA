@@ -1,4 +1,5 @@
 import inspect
+import os
 from selenium.common.exceptions import WebDriverException
 from AIVA.Shra.features.browser.driver import DriverManager
 from AIVA.Shra.features.browser.platforms.youtube import YouTube
@@ -8,6 +9,21 @@ from AIVA.Shra.features.browser.platforms.gmail import Gmail
 from AIVA.Shra.features.browser.platforms.whatsapp import WhatsApp
 from AIVA.Shra.features.browser.window_focus import bring_browser_to_front
 
+import glob
+
+def find_file_by_name(filename):
+    search_dirs = [
+        os.path.join(os.path.expanduser("~"), "Downloads"),
+        os.path.join(os.path.expanduser("~"), "Documents"),
+        os.path.join(os.path.expanduser("~"), "Desktop")
+    ]
+
+    matches = []
+
+    for folder in search_dirs:
+        matches.extend(glob.glob(os.path.join(folder, f"*{filename}*")))
+
+    return matches
 
 class BrowserController:
 
@@ -180,8 +196,16 @@ class BrowserController:
 
         # 🔥 MULTI-STEP EMAIL FLOW (FIXED)
         if self.pending_email:
+            # 🔥 FORCE RAW INPUT (BYPASS PARSER COMPLETELY)
+            # 🔥 FINAL FIX (DO NOT CHANGE ANYTHING ELSE)
 
-            user_input = structured.get("query") or structured.get("message") or ""
+            if isinstance(structured, dict):
+                user_input = structured.get("query") or structured.get("message") or ""
+                if not user_input:
+                    user_input = str(structured)
+            else:
+                user_input = str(structured)
+
             user_input = str(user_input).strip()
 
             step = self.pending_email.get("step")
@@ -202,15 +226,64 @@ class BrowserController:
             if step == "attachment":
                 if user_input.lower() in ["yes", "y"]:
                     self.pending_email["step"] = "attachment_file"
-                    return {"status": "ask", "response": "Please provide file path"}
+                    return {"status": "ask", "response": "What file do you want to attach? (e.g., resume, pdf, image)"}
                 else:
                     self.pending_email["step"] = "confirm"
 
             # ATTACHMENT FILE
             if step == "attachment_file":
-                self.pending_email["attachment"] = user_input
-                self.pending_email["step"] = "confirm"
 
+                clean_input = user_input.strip().strip('"').strip("'")
+
+                # CASE 1: full path
+                if os.path.exists(clean_input):
+                    self.pending_email["attachment"] = clean_input
+                    self.pending_email["step"] = "confirm"
+
+                else:
+                    matches = find_file_by_name(clean_input)
+
+                    if not matches:
+                        return {
+                            "status": "ask",
+                            "response": f"I couldn’t find any file named '{clean_input}'. Try again."
+                        }
+
+                    # store matches for confirmation
+                    self.pending_email["file_matches"] = matches
+                    self.pending_email["step"] = "confirm_file"
+
+                    return {
+                        "status": "ask",
+                        "response": f"I found: {os.path.basename(matches[0])}. Is this the file you want? (yes/no)"
+                    }
+
+            if step == "confirm_file":
+
+                if user_input.lower() in ["yes", "y"]:
+                    selected = self.pending_email["file_matches"][0]
+                    self.pending_email["attachment"] = selected
+                    self.pending_email["step"] = "confirm"
+
+                    return {
+                        "status": "ask",
+                        "response": "Got it. Do you want to send the email now? (yes/no)"
+                    }
+
+                elif user_input.lower() in ["no", "n"]:
+                    # 🔥 THIS IS THE MISSING FIX
+                    self.pending_email["step"] = "attachment_file"
+
+                    return {
+                        "status": "ask",
+                        "response": "Okay, tell me the file name again."
+                    }
+
+                else:
+                    return {
+                        "status": "ask",
+                        "response": "Please answer yes or no."
+                    }
             # CONFIRMATION
             if step == "confirm":
 
@@ -315,20 +388,33 @@ class BrowserController:
                 if to_clean in CONTACTS:
                     to = CONTACTS[to_clean]
 
+
                 elif "@" not in to:
+
                     self.pending_email = {
+
                         "to": None,
+
                         "subject": None,
+
                         "body": None,
+
+                        "attachment": None,
+
                         "step": "email"
+
                     }
+
                     return {
+
                         "status": "ask",
+
                         "response": f"I don't know {to}. Please tell me the email."
+
                     }
 
             self.pending_email = {
-                "to": None,
+                "to": to,
                 "subject": None,
                 "body": None,
                 "attachment": None,

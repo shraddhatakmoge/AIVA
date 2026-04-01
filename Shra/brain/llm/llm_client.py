@@ -53,7 +53,11 @@ Example:
                 content = content.replace("'", '"')
 
             # 🔥 RETURN STRING (IMPORTANT — SAME AS GEMMA)
-            return content
+            try:
+                return json.loads(content)
+            except:
+                print("JSON PARSE ERROR:", content)
+                return {}
 
         except Exception as e:
             print("FULL LLM ERROR:", str(e))

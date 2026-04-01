@@ -222,6 +222,29 @@ If user says:
 → action = "read_messages"
 → target = "whatsapp"
 
+------------------------------
+SEND EMAIL
+------------------------------
+If user says:
+- send email to bhaya
+- send mail to hr
+- email shraddha
+- send email to abc@gmail.com
+
+→ action = "send_email"
+→ target = "gmail"
+
+Extract:
+- "to" (email OR name)
+
+Optional:
+- "subject"
+- "body"
+
+If subject/body not provided:
+→ DO NOT guess
+→ leave them empty
+
 ==================================================
 CRITICAL CONSTRAINTS
 ==================================================

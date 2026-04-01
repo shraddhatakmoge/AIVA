@@ -5,6 +5,8 @@ from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 import pickle
 import os
+from email.mime.base import MIMEBase
+from email import encoders
 
 
 class Gmail:
@@ -85,37 +87,36 @@ class Gmail:
                 "response": str(e)
             }
 
-    from email.mime.base import MIMEBase
-    from email import encoders
-
     def send_email(self, to, subject, body, attachment_path=None):
         try:
             message = MIMEMultipart()
-            message['to'] = to
-            message['subject'] = subject
+            message["to"] = to
+            message["subject"] = subject or "No Subject"
 
             # Body
-            message.attach(MIMEText(body))
+            message.attach(MIMEText(body or ""))
 
-            # 🔥 ATTACHMENT SUPPORT
+            # Attachment
             if attachment_path:
-                if not os.path.exists(attachment_path):
+                clean_path = attachment_path.strip().strip('"').strip("'")
+
+                if not os.path.exists(clean_path):
                     return {
                         "status": "error",
-                        "response": f"Attachment not found: {attachment_path}"
+                        "response": f"Attachment not found: {clean_path}"
                     }
 
-                part = MIMEBase('application', 'octet-stream')
+                part = MIMEBase("application", "octet-stream")
 
-                with open(attachment_path, 'rb') as file:
+                with open(clean_path, "rb") as file:
                     part.set_payload(file.read())
 
                 encoders.encode_base64(part)
 
-                filename = os.path.basename(attachment_path)
+                filename = os.path.basename(clean_path)
                 part.add_header(
-                    'Content-Disposition',
-                    f'attachment; filename={filename}'
+                    "Content-Disposition",
+                    f'attachment; filename="{filename}"'
                 )
 
                 message.attach(part)
@@ -123,8 +124,8 @@ class Gmail:
             raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
 
             self.service.users().messages().send(
-                userId='me',
-                body={'raw': raw}
+                userId="me",
+                body={"raw": raw}
             ).execute()
 
             return {
