@@ -104,6 +104,7 @@ If platform not mentioned:
 → default target = "youtube"
 
 ------------------------------
+------------------------------
 PAUSE / STOP MEDIA
 ------------------------------
 If user says:
@@ -113,8 +114,8 @@ If user says:
 → action = "pause"
 
 If platform not mentioned:
-→ default target = "youtube"
-
+→ DO NOT include "target"
+→ system will use last active platform
 ------------------------------
 RESUME MEDIA
 ------------------------------

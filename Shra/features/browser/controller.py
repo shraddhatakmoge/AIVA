@@ -54,8 +54,8 @@ class BrowserController:
             self.last_active_platform = target
             return platform.open()
 
-        url = platform.get_url()
-        self.driver.execute_script(f"window.open('{url}', '_blank');")
+        # 🔥 OPEN EMPTY TAB ONLY (NO URL)
+        self.driver.execute_script("window.open('', '_blank');")
 
         new_handle = self.driver.window_handles[-1]
         self.driver.switch_to.window(new_handle)
@@ -65,6 +65,7 @@ class BrowserController:
 
         bring_browser_to_front()
 
+        # 🔥 LET PLATFORM HANDLE URL
         return platform.open()
 
     # -------------------------------------------------
@@ -115,17 +116,26 @@ class BrowserController:
     # -------------------------------------------------
     def _detect_target(self, structured):
 
+        action = structured.get("action")
         target = structured.get("target")
 
+        # 🔥 1. ALWAYS respect user explicit target
         if target:
             return target
 
+        # 🔥 2. Context-aware actions → use last active
+        context_actions = ["pause", "resume", "stop", "add_to_favorites"]
+
+        if action in context_actions:
+            if self.last_active_platform:
+                return self.last_active_platform
+
+        # 🔥 3. fallback to last active
         if self.last_active_platform:
             return self.last_active_platform
 
+        # 🔥 4. default fallback
         return "youtube"
-
-    # -------------------------------------------------
     # SAFE METHOD EXECUTION
     # -------------------------------------------------
     def _execute_platform_method(self, platform, action, query):
@@ -172,40 +182,70 @@ class BrowserController:
         if self.pending_email:
 
             user_input = structured.get("query") or structured.get("message") or ""
-
-            if isinstance(user_input, dict):
-                user_input = str(user_input)
-
-            user_input = user_input.strip()
+            user_input = str(user_input).strip()
 
             step = self.pending_email.get("step")
 
-            # EMAIL STEP
-            if step == "email":
-                self.pending_email["to"] = user_input
-                self.pending_email["step"] = "subject"
-                return {"status": "ask", "response": "What should be the subject?"}
-
-            # SUBJECT STEP
+            # SUBJECT
             if step == "subject":
                 self.pending_email["subject"] = user_input
                 self.pending_email["step"] = "body"
                 return {"status": "ask", "response": "What should I write in the email?"}
 
-            # BODY STEP
+            # BODY
             if step == "body":
                 self.pending_email["body"] = user_input
+                self.pending_email["step"] = "attachment"
+                return {"status": "ask", "response": "Do you want to attach anything? (yes/no)"}
 
+            # ATTACHMENT DECISION
+            if step == "attachment":
+                if user_input.lower() in ["yes", "y"]:
+                    self.pending_email["step"] = "attachment_file"
+                    return {"status": "ask", "response": "Please provide file path"}
+                else:
+                    self.pending_email["step"] = "confirm"
+
+            # ATTACHMENT FILE
+            if step == "attachment_file":
+                self.pending_email["attachment"] = user_input
+                self.pending_email["step"] = "confirm"
+
+            # CONFIRMATION
+            if step == "confirm":
+
+                # FIRST TIME → SHOW PREVIEW
+                if user_input.lower() not in ["yes", "y", "no", "n"]:
+                    preview = f"""
+        To: {self.pending_email['to']}
+        Subject: {self.pending_email['subject']}
+        Body: {self.pending_email['body']}
+        Attachment: {self.pending_email.get('attachment', 'None')}
+        """
+                    return {
+                        "status": "ask",
+                        "response": f"{preview}\nDo you want to send it? (yes/no)"
+                    }
+
+                # CANCEL
+                if user_input.lower() in ["no", "n", "cancel", "stop"]:
+                    self.pending_email = None
+                    return {
+                        "status": "success",
+                        "response": "Email discarded."
+                    }
+
+                # SEND
                 gmail = Gmail(None)
 
                 to = self.pending_email["to"]
                 subject = self.pending_email["subject"]
                 body = self.pending_email["body"]
+                attachment = self.pending_email.get("attachment")
 
                 self.pending_email = None
 
-                return gmail.send_email(to, subject, body)
-
+                return gmail.send_email(to, subject, body, attachment)
 
         if not structured:
             return {
@@ -228,6 +268,11 @@ class BrowserController:
         action = structured.get("action")
         query = structured.get("query")
 
+        # ✅ READ EMAIL HANDLER
+        if action == "read_latest_email":
+            gmail = Gmail(None)
+            return gmail.read_latest_email()
+
         if not action:
             return {
                 "status": "error",
@@ -236,6 +281,8 @@ class BrowserController:
 
         target = self._detect_target(structured)
 
+        # 🔥 FIX: sync structured with actual target
+        structured["target"] = target
         # CLOSE ENTIRE BROWSER
         if action == "close_browser":
             try:
@@ -254,11 +301,10 @@ class BrowserController:
                     "response": str(e)
                 }
 
-        # 🔥 UPDATED EMAIL ENTRY POINT
+        # EMAIL ENTRY
         if action == "send_email":
 
             query_data = structured.get("query", {})
-
             to = query_data.get("to")
 
             from contacts import CONTACTS
@@ -281,11 +327,11 @@ class BrowserController:
                         "response": f"I don't know {to}. Please tell me the email."
                     }
 
-            # 🔥 START FLOW
             self.pending_email = {
-                "to": to,
+                "to": None,
                 "subject": None,
                 "body": None,
+                "attachment": None,
                 "step": "subject"
             }
 
@@ -331,6 +377,14 @@ class BrowserController:
             if target in self.tabs:
                 try:
                     self._switch_to_tab(target)
+
+                    # 🔥 FIX: Prevent closing last tab
+                    if len(self.driver.window_handles) == 1:
+                        return {
+                            "status": "info",
+                            "response": "Cannot close the last tab. Use 'close browser' instead."
+                        }
+
                     self.driver.close()
                     self.tabs.pop(target, None)
 
@@ -344,22 +398,23 @@ class BrowserController:
                         "status": "error",
                         "response": f"Could not close tab: {str(e)}"
                     }
+        # AUTO OPEN (🔥 FIX APPLIED HERE)
+        just_opened = False
 
-            return {
-                "status": "error",
-                "response": f"{target.capitalize()} is not open."
-            }
-
-        # AUTO OPEN
         if target not in self.tabs:
             open_result = self._open_new_tab(target)
+            just_opened = True
+
             if open_result.get("status") not in ["success", "login_required"]:
                 return open_result
         else:
             self._switch_to_tab(target)
 
-        # EXECUTE
-        result = self._execute_platform_method(platform, action, query)
+        # EXECUTE (🔥 FIX APPLIED HERE)
+        if just_opened and action == "play":
+            result = platform.play(query)
+        else:
+            result = self._execute_platform_method(platform, action, query)
 
         if result.get("status") == "success":
             self.last_active_platform = target

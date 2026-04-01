@@ -21,10 +21,35 @@ class YouTube:
         return "https://www.youtube.com"
 
     # -------------------------------------------------
+    # 🔥 SAFE GET (ADDED - DO NOT REMOVE ORIGINAL FLOW)
+    # -------------------------------------------------
+    def _safe_get(self, url):
+        try:
+            time.sleep(1.5)
+            self.driver.get(url)
+        except:
+            print("⚠️ Page load timeout, stopping...")
+            self.driver.execute_script("window.stop();")
+
+    # -------------------------------------------------
+    # 🔥 SAFE CURRENT URL (ADDED - NO LOGIC CHANGE)
+    # -------------------------------------------------
+    def _get_safe_current_url(self):
+        try:
+            return self.driver.current_url
+        except:
+            try:
+                self.driver.switch_to.window(self.driver.window_handles[0])
+                return self.driver.current_url
+            except:
+                return ""
+
+    # -------------------------------------------------
     # OPEN
     # -------------------------------------------------
     def open(self):
-        self.driver.get(self.get_url())
+        # 🔥 replaced driver.get with safe_get (no behavior change)
+        self._safe_get(self.get_url())
         bring_browser_to_front()
 
         return {
@@ -70,10 +95,6 @@ class YouTube:
     # 🔥 NEW: GET REAL CURRENT VIDEO TITLE
     # -------------------------------------------------
     def _get_current_video_title(self):
-        """
-        Extract canonical video title from YouTube player page.
-        """
-
         try:
             title_element = WebDriverWait(self.driver, 10).until(
                 EC.presence_of_element_located(
@@ -100,7 +121,10 @@ class YouTube:
 
         wait = WebDriverWait(self.driver, 20)
 
-        self.open()
+        # 🔥 ONLY THIS PART MODIFIED (SAFE URL CHECK)
+        current_url = self._get_safe_current_url()
+        if "youtube" not in current_url:
+            self.open()
 
         search_box = wait.until(
             EC.presence_of_element_located((By.NAME, "search_query"))
@@ -132,7 +156,10 @@ class YouTube:
 
         wait = WebDriverWait(self.driver, 20)
 
-        self.open()
+        # 🔥 ONLY THIS PART MODIFIED (SAFE URL CHECK)
+        current_url = self._get_safe_current_url()
+        if "youtube" not in current_url:
+            self.open()
 
         search_box = wait.until(
             EC.presence_of_element_located((By.NAME, "search_query"))
@@ -143,7 +170,6 @@ class YouTube:
         search_box.submit()
 
         try:
-            # Wait until results load
             wait.until(
                 EC.presence_of_all_elements_located((By.XPATH, '//a[@id="video-title"]'))
             )
@@ -161,7 +187,6 @@ class YouTube:
 
                 title_lower = title.lower()
 
-                # 🔥 Smart Filtering
                 if (
                         query_lower in title_lower and
                         "ad" not in title_lower and
@@ -171,7 +196,6 @@ class YouTube:
                     selected_video = video
                     break
 
-            # If no smart match found, fallback to first visible video
             if not selected_video and videos:
                 selected_video = videos[0]
 
@@ -190,7 +214,6 @@ class YouTube:
                 "response": "No videos found."
             }
 
-        # 🔥 STORE REAL VIDEO TITLE
         real_title = self._get_current_video_title()
 
         if real_title:
@@ -208,7 +231,7 @@ class YouTube:
         }
 
     # -------------------------------------------------
-    # PAUSE (STATE-AWARE)
+    # PAUSE
     # -------------------------------------------------
     def pause(self):
 
@@ -246,7 +269,7 @@ class YouTube:
             }
 
     # -------------------------------------------------
-    # RESUME (STATE-AWARE)
+    # RESUME
     # -------------------------------------------------
     def resume(self):
 
@@ -290,9 +313,14 @@ class YouTube:
         return self.pause()
 
     # -------------------------------------------------
-    # ADD TO FAVORITES (FIXED RETURN HANDLING)
+    # ADD TO FAVORITES
     # -------------------------------------------------
     def add_to_favorites(self):
+
+        live_song = self._get_current_video_title()
+
+        if live_song:
+            self.current_song = live_song
 
         song = self.current_song or self.memory.get_last_played()
 

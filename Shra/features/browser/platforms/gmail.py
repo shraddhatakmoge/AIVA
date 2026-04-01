@@ -46,15 +46,79 @@ class Gmail:
 
         return build('gmail', 'v1', credentials=creds)
 
-    def send_email(self, to, subject, body):
+    def read_latest_email(self):
         try:
-            # 🔥 Using multipart (future-ready for attachments)
+            results = self.service.users().messages().list(
+                userId='me',
+                maxResults=1
+            ).execute()
+
+            messages = results.get('messages', [])
+
+            if not messages:
+                return {
+                    "status": "error",
+                    "response": "No emails found."
+                }
+
+            msg_id = messages[0]['id']
+
+            msg = self.service.users().messages().get(
+                userId='me',
+                id=msg_id,
+                format='full'
+            ).execute()
+
+            headers = msg['payload']['headers']
+
+            subject = next((h['value'] for h in headers if h['name'] == 'Subject'), "No Subject")
+            sender = next((h['value'] for h in headers if h['name'] == 'From'), "Unknown Sender")
+
+            return {
+                "status": "success",
+                "response": f"Latest email from {sender}: {subject}"
+            }
+
+        except Exception as e:
+            return {
+                "status": "error",
+                "response": str(e)
+            }
+
+    from email.mime.base import MIMEBase
+    from email import encoders
+
+    def send_email(self, to, subject, body, attachment_path=None):
+        try:
             message = MIMEMultipart()
             message['to'] = to
             message['subject'] = subject
 
             # Body
             message.attach(MIMEText(body))
+
+            # 🔥 ATTACHMENT SUPPORT
+            if attachment_path:
+                if not os.path.exists(attachment_path):
+                    return {
+                        "status": "error",
+                        "response": f"Attachment not found: {attachment_path}"
+                    }
+
+                part = MIMEBase('application', 'octet-stream')
+
+                with open(attachment_path, 'rb') as file:
+                    part.set_payload(file.read())
+
+                encoders.encode_base64(part)
+
+                filename = os.path.basename(attachment_path)
+                part.add_header(
+                    'Content-Disposition',
+                    f'attachment; filename={filename}'
+                )
+
+                message.attach(part)
 
             raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
 

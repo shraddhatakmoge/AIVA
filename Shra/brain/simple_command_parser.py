@@ -383,6 +383,43 @@ class SimpleCommandParser:
                 "action": "play_music",
                 "query": remaining
             }
+        # ------------------------------
+        # PAUSE / RESUME / STOP WITH TARGET
+        # ------------------------------
+        # PAUSE / RESUME / STOP WITH TARGET
+        # ------------------------------
+        for action_word in ["pause", "resume", "stop"]:
+            if lower_command.startswith(action_word):
+
+                remaining = lower_command.replace(action_word, "", 1).strip()
+
+                # CASE 1: "on youtube"
+                if " on " in remaining:
+                    _, target = remaining.split(" on ", 1)
+                    target = self._normalize_platform(target.strip())
+
+                    return {
+                        "status": "success",
+                        "action": action_word,
+                        "target": target
+                    }
+
+                # CASE 2: "resume spotify"
+                if remaining:
+                    possible_target = self._normalize_platform(remaining)
+
+                    if possible_target in self.valid_platforms:
+                        return {
+                            "status": "success",
+                            "action": action_word,
+                            "target": possible_target
+                        }
+
+                # CASE 3: no target → fallback
+                return {
+                    "status": "success",
+                    "action": action_word
+                }
 
         if lower_command.startswith("close "):
             target = lower_command.replace("close ", "", 1).strip()

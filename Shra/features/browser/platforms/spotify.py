@@ -23,10 +23,23 @@ class Spotify:
         return "https://open.spotify.com"
 
     # -------------------------------------------------
+    # SAFE GET (🔥 NEW - CRITICAL FIX)
+    # -------------------------------------------------
+    def _safe_get(self, url):
+        try:
+            time.sleep(1.5)  # 🔥 allow previous actions to settle
+            self.driver.get(url)
+        except Exception:
+            print("⚠️ Page load timeout, stopping load...")
+            self.driver.execute_script("window.stop();")
+
+    # -------------------------------------------------
     # OPEN
     # -------------------------------------------------
     def open(self):
-        self.driver.get(self.get_url())
+
+        # 🔥 use safe get
+        self._safe_get(self.get_url())
 
         WebDriverWait(self.driver, 20).until(
             EC.presence_of_element_located((By.TAG_NAME, "body"))
@@ -138,7 +151,7 @@ class Spotify:
         }
 
     # -------------------------------------------------
-    # PLAY (HARDENED VERSION)
+    # PLAY (🔥 FIXED STABLE VERSION)
     # -------------------------------------------------
     def play(self, query):
 
@@ -148,7 +161,9 @@ class Spotify:
                 "response": "No song specified to play."
             }
 
-        self.open()
+        # 🔥 ONLY open if not already on spotify
+        if "spotify" not in self.driver.current_url:
+            self.open()
 
         if not self._is_logged_in():
             return {
@@ -161,20 +176,19 @@ class Spotify:
         try:
             encoded_query = urllib.parse.quote(query)
             songs_url = f"https://open.spotify.com/search/{encoded_query}/tracks"
-            self.driver.get(songs_url)
 
-            # Ensure tab is active
+            # 🔥 SAFE navigation
+            self._safe_get(songs_url)
+
             self.driver.switch_to.window(self.driver.current_window_handle)
             bring_browser_to_front()
 
-            # Wait for first track to be clickable
             first_track = wait.until(
                 EC.element_to_be_clickable(
                     (By.XPATH, "(//div[@data-testid='tracklist-row'])[1]")
                 )
             )
 
-            # Scroll to element
             self.driver.execute_script(
                 "arguments[0].scrollIntoView({block: 'center'});",
                 first_track
@@ -182,33 +196,18 @@ class Spotify:
 
             time.sleep(1)
 
-            # Force activation of document (important for autoplay)
             self.driver.execute_script("window.focus();")
 
-            # Dispatch REAL double click event
-            # Scroll to first track
-            self.driver.execute_script(
-                "arguments[0].scrollIntoView({block: 'center'});",
-                first_track
-            )
-
-            time.sleep(1)
-
-            # Click play button inside row
-            # Double click track to play
             actions = ActionChains(self.driver)
             actions.move_to_element(first_track).double_click().perform()
-            time.sleep(3)
 
             time.sleep(3)
 
-            # If still not playing → force press play button
             if not self._is_playing():
                 play_btn = self._get_play_pause_button()
                 if play_btn:
                     self.driver.execute_script("arguments[0].click();", play_btn)
 
-            # Final verification wait
             WebDriverWait(self.driver, 15).until(
                 lambda d: self._is_playing()
             )
@@ -225,7 +224,6 @@ class Spotify:
                 "response": f"Playback failed: {str(e)}"
             }
 
-        # Get actual title
         real_title = self._get_current_track_title()
 
         if real_title:

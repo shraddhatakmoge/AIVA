@@ -15,7 +15,14 @@ class ResponseParser:
 
             data = json.loads(match.group())
 
-            return data
+            # 🔥 NORMALIZATION LAYER (IMPORTANT)
+            structured = {
+                "action": data.get("action"),
+                "target": data.get("app"),     # map app → target
+                "query": data.get("text")      # map text → query
+            }
+
+            return structured
 
         except Exception as e:
             return {
