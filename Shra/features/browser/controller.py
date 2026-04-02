@@ -1,6 +1,10 @@
 import inspect
 import os
+import glob
+from difflib import get_close_matches
+
 from selenium.common.exceptions import WebDriverException
+
 from AIVA.Shra.features.browser.driver import DriverManager
 from AIVA.Shra.features.browser.platforms.youtube import YouTube
 from AIVA.Shra.features.browser.platforms.spotify import Spotify
@@ -9,7 +13,6 @@ from AIVA.Shra.features.browser.platforms.gmail import Gmail
 from AIVA.Shra.features.browser.platforms.whatsapp import WhatsApp
 from AIVA.Shra.features.browser.window_focus import bring_browser_to_front
 
-import glob
 
 def find_file_by_name(filename):
     search_dirs = [
@@ -24,6 +27,7 @@ def find_file_by_name(filename):
         matches.extend(glob.glob(os.path.join(folder, f"*{filename}*")))
 
     return matches
+
 
 class BrowserController:
 
@@ -152,6 +156,8 @@ class BrowserController:
 
         # 🔥 4. default fallback
         return "youtube"
+
+    # -------------------------------------------------
     # SAFE METHOD EXECUTION
     # -------------------------------------------------
     def _execute_platform_method(self, platform, action, query):
@@ -190,45 +196,105 @@ class BrowserController:
             }
 
     # -------------------------------------------------
+    # EMAIL PREVIEW HELPER
+    # -------------------------------------------------
+    def _build_email_preview(self):
+        attachment = self.pending_email.get("attachment")
+        attachment_name = os.path.basename(attachment) if attachment else "None"
+
+        return f"""Here’s your email:
+To: {self.pending_email['to']}
+Subject: {self.pending_email['subject']}
+Body: {self.pending_email['body']}
+Attachment: {attachment_name}
+
+What would you like to do next?
+You can say:
+- send it
+- change subject
+- change body
+- change attachment
+- cancel"""
+
+    # -------------------------------------------------
     # HANDLE COMMAND
     # -------------------------------------------------
     def handle(self, structured):
 
-        # 🔥 MULTI-STEP EMAIL FLOW (FIXED)
+        # 🔥 MULTI-STEP EMAIL FLOW
         if self.pending_email:
-            # 🔥 FORCE RAW INPUT (BYPASS PARSER COMPLETELY)
-            # 🔥 FINAL FIX (DO NOT CHANGE ANYTHING ELSE)
 
+            # 🔥 FORCE RAW INPUT (BYPASS PARSER COMPLETELY)
             if isinstance(structured, dict):
                 user_input = structured.get("query") or structured.get("message") or ""
-                if not user_input:
-                    user_input = str(structured)
+
+                # 🔥 CRITICAL FIX: prevent dict fallback
+                if isinstance(user_input, dict):
+                    user_input = ""
+
             else:
                 user_input = str(structured)
 
             user_input = str(user_input).strip()
-
+            user_lower = user_input.lower()
             step = self.pending_email.get("step")
 
             # SUBJECT
             if step == "subject":
                 self.pending_email["subject"] = user_input
                 self.pending_email["step"] = "body"
-                return {"status": "ask", "response": "What should I write in the email?"}
+                return {
+                    "status": "ask",
+                    "response": "What should I write in the email?"
+                }
 
             # BODY
             if step == "body":
                 self.pending_email["body"] = user_input
                 self.pending_email["step"] = "attachment"
-                return {"status": "ask", "response": "Do you want to attach anything? (yes/no)"}
+                return {
+                    "status": "ask",
+                    "response": "Do you want to attach anything? (yes/no)"
+                }
 
             # ATTACHMENT DECISION
             if step == "attachment":
-                if user_input.lower() in ["yes", "y"]:
+                if user_lower in ["yes", "y"]:
                     self.pending_email["step"] = "attachment_file"
-                    return {"status": "ask", "response": "What file do you want to attach? (e.g., resume, pdf, image)"}
-                else:
+                    return {
+                        "status": "ask",
+                        "response": "What file do you want to attach? (e.g., resume, pdf, image)"
+                    }
+
+                if user_lower in ["no", "n"]:
                     self.pending_email["step"] = "confirm"
+                    return {
+                        "status": "ask",
+                        "response": f"No attachment added.\n\n{self._build_email_preview()}"
+                    }
+
+                return {
+                    "status": "ask",
+                    "response": "Please answer yes or no."
+                }
+
+            # EDIT SUBJECT
+            if step == "edit_subject":
+                self.pending_email["subject"] = user_input
+                self.pending_email["step"] = "confirm"
+                return {
+                    "status": "ask",
+                    "response": f"Subject updated.\n\n{self._build_email_preview()}"
+                }
+
+            # EDIT BODY
+            if step == "edit_body":
+                self.pending_email["body"] = user_input
+                self.pending_email["step"] = "confirm"
+                return {
+                    "status": "ask",
+                    "response": f"Body updated.\n\n{self._build_email_preview()}"
+                }
 
             # ATTACHMENT FILE
             if step == "attachment_file":
@@ -240,38 +306,68 @@ class BrowserController:
                     self.pending_email["attachment"] = clean_input
                     self.pending_email["step"] = "confirm"
 
-                else:
-                    matches = find_file_by_name(clean_input)
-
-                    if not matches:
-                        return {
-                            "status": "ask",
-                            "response": f"I couldn’t find any file named '{clean_input}'. Try again."
-                        }
-
-                    # store matches for confirmation
-                    self.pending_email["file_matches"] = matches
-                    self.pending_email["step"] = "confirm_file"
+                    filename = os.path.basename(clean_input)
 
                     return {
                         "status": "ask",
-                        "response": f"I found: {os.path.basename(matches[0])}. Is this the file you want? (yes/no)"
+                        "response": f'Got it 👍 I\'ve attached "{filename}"\n\n{self._build_email_preview()}'
                     }
 
-            if step == "confirm_file":
+                matches = find_file_by_name(clean_input)
 
-                if user_input.lower() in ["yes", "y"]:
-                    selected = self.pending_email["file_matches"][0]
+                if not matches:
+                    return {
+                        "status": "ask",
+                        "response": f"I couldn’t find any file named '{clean_input}'. Try again."
+                    }
+
+                # 🔥 LIMIT TOP 5 RESULTS
+                matches = matches[:5]
+
+                # 🔥 CASE 1: ONLY ONE FILE → AUTO SELECT
+                if len(matches) == 1:
+                    selected = matches[0]
+
+                    self.pending_email["file_matches"] = matches
+                    self.pending_email["step"] = "confirm_single_file"
+
+                    filename = os.path.basename(selected)
+
+                    return {
+                        "status": "ask",
+                        "response": f'I found "{filename}". Is this the file you want to attach? (yes/no)'
+                    }
+
+                # 🔥 CASE 2: MULTIPLE FILES → ASK USER
+                self.pending_email["file_matches"] = matches
+                self.pending_email["step"] = "select_file"
+
+                options = "\n".join(
+                    [f"{i + 1}. {os.path.basename(f)}" for i, f in enumerate(matches)]
+                )
+
+                return {
+                    "status": "ask",
+                    "response": f"I found multiple files:\n{options}\n\nSelect one (number or name):"
+                }
+
+            if step == "confirm_single_file":
+
+                matches = self.pending_email.get("file_matches", [])
+                selected = matches[0]
+
+                if user_lower in ["yes", "y"]:
                     self.pending_email["attachment"] = selected
                     self.pending_email["step"] = "confirm"
 
+                    filename = os.path.basename(selected)
+
                     return {
                         "status": "ask",
-                        "response": "Got it. Do you want to send the email now? (yes/no)"
+                        "response": f'Got it 👍 I\'ve attached "{filename}"\n\n{self._build_email_preview()}'
                     }
 
-                elif user_input.lower() in ["no", "n"]:
-                    # 🔥 THIS IS THE MISSING FIX
+                elif user_lower in ["no", "n"]:
                     self.pending_email["step"] = "attachment_file"
 
                     return {
@@ -282,43 +378,198 @@ class BrowserController:
                 else:
                     return {
                         "status": "ask",
-                        "response": "Please answer yes or no."
+                        "response": "Please say yes or no."
                     }
+            # SELECT FILE
+            if step == "select_file":
+
+                matches = self.pending_email.get("file_matches", [])
+                filenames = [os.path.basename(f).lower() for f in matches]
+
+                # ---------------------------
+                # 1. NUMBER (1, 2, 3)
+                # ---------------------------
+                if user_lower.isdigit():
+                    index = int(user_lower) - 1
+                    if 0 <= index < len(matches):
+                        selected = matches[index]
+                    else:
+                        return {
+                            "status": "ask",
+                            "response": "Invalid number. Try again."
+                        }
+
+                # ---------------------------
+                # 2. WORD NUMBERS
+                # ---------------------------
+                elif user_lower in ["first", "1st"]:
+                    selected = matches[0]
+
+                elif user_lower in ["second", "2nd"] and len(matches) > 1:
+                    selected = matches[1]
+
+                elif user_lower in ["third", "3rd"] and len(matches) > 2:
+                    selected = matches[2]
+
+                elif user_lower in ["fourth", "4th"] and len(matches) > 3:
+                    selected = matches[3]
+
+                elif user_lower in ["fifth", "5th"] and len(matches) > 4:
+                    selected = matches[4]
+
+                elif "last" in user_lower:
+                    selected = matches[-1]
+
+                # ---------------------------
+                # 3. FUZZY MATCH
+                # ---------------------------
+                else:
+                    close = get_close_matches(user_lower, filenames, n=1, cutoff=0.3)
+
+                    if close:
+                        idx = filenames.index(close[0])
+                        selected = matches[idx]
+                    else:
+                        return {
+                            "status": "ask",
+                            "response": "I couldn't match that. Try saying part of the file name or number."
+                        }
+
+                self.pending_email["attachment"] = selected
+                self.pending_email["step"] = "confirm"
+
+                filename = os.path.basename(selected)
+
+                return {
+                    "status": "ask",
+                    "response": f'✅ File selected: "{filename}"\n\n{self._build_email_preview()}\n\nDo you want to send the mail now? (yes/no)'
+                }
+
+            # CONFIRMATION
             # CONFIRMATION
             if step == "confirm":
 
-                # FIRST TIME → SHOW PREVIEW
-                if user_input.lower() not in ["yes", "y", "no", "n"]:
-                    preview = f"""
-        To: {self.pending_email['to']}
-        Subject: {self.pending_email['subject']}
-        Body: {self.pending_email['body']}
-        Attachment: {self.pending_email.get('attachment', 'None')}
-        """
+                # ----------------------
+                # YES → SEND MAIL
+                # ----------------------
+                if user_lower in ["yes", "y", "send", "send it", "go ahead", "ok", "okay"]:
+                    gmail = Gmail(None)
+
+                    to = self.pending_email["to"]
+                    subject = self.pending_email["subject"]
+                    body = self.pending_email["body"]
+                    attachment = self.pending_email.get("attachment")
+
+                    self.pending_email = None
+
+                    return gmail.send_email(to, subject, body, attachment)
+
+                # ----------------------
+                # NO → EDIT OPTIONS
+                # ----------------------
+                elif user_lower in ["no", "n"]:
                     return {
                         "status": "ask",
-                        "response": f"{preview}\nDo you want to send it? (yes/no)"
+                        "response": """What would you like to change?
+            You can say:
+            - change subject
+            - change body
+            - change attachment
+            - cancel"""
                     }
 
+                # ----------------------
+                # EDIT SUBJECT
+                # ----------------------
+                elif "subject" in user_lower:
+                    self.pending_email["step"] = "edit_subject"
+                    return {
+                        "status": "ask",
+                        "response": "Enter new subject:"
+                    }
+
+                # ----------------------
+                # EDIT BODY
+                # ----------------------
+                elif "body" in user_lower or "message" in user_lower:
+                    self.pending_email["step"] = "edit_body"
+                    return {
+                        "status": "ask",
+                        "response": "Enter new body:"
+                    }
+
+                # ----------------------
+                # CHANGE ATTACHMENT
+                # ----------------------
+                elif "attachment" in user_lower or "file" in user_lower:
+                    self.pending_email["step"] = "attachment_file"
+                    return {
+                        "status": "ask",
+                        "response": "Enter new file name:"
+                    }
+
+                # ----------------------
                 # CANCEL
-                if user_input.lower() in ["no", "n", "cancel", "stop"]:
+                # ----------------------
+                elif "cancel" in user_lower:
                     self.pending_email = None
                     return {
                         "status": "success",
                         "response": "Email discarded."
                     }
 
-                # SEND
-                gmail = Gmail(None)
+                # ----------------------
+                # DEFAULT
+                # ----------------------
+                return {
+                    "status": "ask",
+                    "response": "Please answer yes or no."
+                }
+                # CANCEL
+                if any(
+                    phrase in user_lower
+                    for phrase in ["no", "n", "5", "cancel", "stop", "discard"]
+                ):
+                    self.pending_email = None
+                    return {
+                        "status": "success",
+                        "response": "Email discarded."
+                    }
 
-                to = self.pending_email["to"]
-                subject = self.pending_email["subject"]
-                body = self.pending_email["body"]
-                attachment = self.pending_email.get("attachment")
+                # EDIT SUBJECT
+                if user_lower in ["2", "edit subject"] or "subject" in user_lower:
+                    self.pending_email["step"] = "edit_subject"
+                    return {
+                        "status": "ask",
+                        "response": "Enter new subject:"
+                    }
 
-                self.pending_email = None
+                # EDIT BODY
+                if user_lower in ["3", "edit body"] or "body" in user_lower or "message" in user_lower:
+                    self.pending_email["step"] = "edit_body"
+                    return {
+                        "status": "ask",
+                        "response": "Enter new body:"
+                    }
 
-                return gmail.send_email(to, subject, body, attachment)
+                # CHANGE / ADD ATTACHMENT
+                if (
+                    user_lower in ["4", "change attachment", "add attachment"]
+                    or "attachment" in user_lower
+                    or "file" in user_lower
+                    or "attach" in user_lower
+                ):
+                    self.pending_email["step"] = "attachment_file"
+                    return {
+                        "status": "ask",
+                        "response": "Enter new file name:"
+                    }
+
+                # DEFAULT → SHOW GUIDED PREVIEW
+                return {
+                    "status": "ask",
+                    "response": self._build_email_preview()
+                }
 
         if not structured:
             return {
@@ -356,6 +607,7 @@ class BrowserController:
 
         # 🔥 FIX: sync structured with actual target
         structured["target"] = target
+
         # CLOSE ENTIRE BROWSER
         if action == "close_browser":
             try:
@@ -388,29 +640,18 @@ class BrowserController:
                 if to_clean in CONTACTS:
                     to = CONTACTS[to_clean]
 
-
                 elif "@" not in to:
-
                     self.pending_email = {
-
                         "to": None,
-
                         "subject": None,
-
                         "body": None,
-
                         "attachment": None,
-
                         "step": "email"
-
                     }
 
                     return {
-
                         "status": "ask",
-
                         "response": f"I don't know {to}. Please tell me the email."
-
                     }
 
             self.pending_email = {
@@ -484,7 +725,8 @@ class BrowserController:
                         "status": "error",
                         "response": f"Could not close tab: {str(e)}"
                     }
-        # AUTO OPEN (🔥 FIX APPLIED HERE)
+
+        # AUTO OPEN
         just_opened = False
 
         if target not in self.tabs:
@@ -496,7 +738,7 @@ class BrowserController:
         else:
             self._switch_to_tab(target)
 
-        # EXECUTE (🔥 FIX APPLIED HERE)
+        # EXECUTE
         if just_opened and action == "play":
             result = platform.play(query)
         else:
