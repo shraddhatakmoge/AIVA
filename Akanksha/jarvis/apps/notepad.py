@@ -124,11 +124,12 @@ def read_notepad():
         for line in text.splitlines():
             if line.strip():
                 speak(line)
-                
+            
 # -------- REPLACE WORD --------
 def replace_word(old, new):
     win = focus_notepad()
     if win:
+        speak(f"Replacing {old} with {new}")
         click_inside_notepad(win)
         time.sleep(0.5)
 
@@ -145,25 +146,25 @@ def replace_word(old, new):
         text = pyperclip.paste()
 
         if not text.strip():
-            print("There is no text")
+            print("❌ There is no text")
             speak("There is no text")
             return
 
-        # Replace text
+        # Replace text natively in Python
         new_text = text.replace(old, new)
 
-        # Copy new text
+        # Copy new text to clipboard
         pyperclip.copy(new_text)
         time.sleep(0.2)
 
-        # Paste back
+        # Paste back into Notepad
         pyautogui.hotkey("ctrl", "a")
         time.sleep(0.3)
         pyautogui.hotkey("ctrl", "v")
 
-        print(f"Replaced '{old}' with '{new}'")
+        print(f"✅ Replaced '{old}' with '{new}'")
                 
-# -------- DELETE WORD ------
+# -------- DELETE WORD (PRESERVES NEWLINES) ------
 def delete_word(word):
     win = focus_notepad()
     if win:
@@ -187,10 +188,20 @@ def delete_word(word):
             speak("There is no text")
             return
 
-        # Remove only exact word
-        words = text.split()
-        words = [w for w in words if w.lower() != word.lower()]
-        new_text = " ".join(words)
+        # 🔥 THE FIX: Process the document line-by-line to protect your paragraphs
+        lines = text.split('\n')
+        new_lines = []
+        
+        for line in lines:
+            # Split only the words on this specific line
+            words = line.split() 
+            # Filter out the target word
+            words = [w for w in words if w.lower() != word.lower()]
+            # Rejoin the line
+            new_lines.append(" ".join(words))
+
+        # Glue the document back together using newlines (\n) instead of spaces
+        new_text = "\n".join(new_lines)
 
         # Put updated text back
         pyperclip.copy(new_text)
@@ -199,8 +210,12 @@ def delete_word(word):
         pyautogui.hotkey("ctrl", "a")
         time.sleep(0.3)
         pyautogui.hotkey("ctrl", "v")
+        
+        # 🔥 THE FIX (Part 2): Move cursor to the bottom so the screen doesn't jump to the top
+        time.sleep(0.2)
+        pyautogui.hotkey("ctrl", "end")
 
-        print(f"Deleted word '{word}'")
+        print(f"✅ Deleted word '{word}'")
 
 # --------- NEW LINE --------
 def new_line():
@@ -210,56 +225,106 @@ def new_line():
         pyautogui.press("enter")
         print("New line added")
 
-# --------- INSERT AT CURSOR -----
+# --------- INSERT TEXT AT CURSOR -----
 def insert_at_cursor(text):
     win = focus_notepad()
-    if win:
-        # ❌ DO NOT click (it changes cursor position)
-        win.activate()
-        time.sleep(0.2)
+    if not win:
+        print("❌ Could not find or open Notepad.")
+        return
 
-        pyautogui.write(text, interval=0.05)
+    # ⚠️ CRITICAL: Do NOT call click_inside_notepad() here!
+    # Clicking will move the user's cursor to the middle of the screen.
+    # focus_notepad() already brought the window to the front.
+    time.sleep(0.2) # Just a tiny pause to let Windows focus settle
 
-        print(f"Inserted '{text}' at cursor")
+    # Use clipboard pasting instead of pyautogui.write(). 
+    # It is instant and avoids typos if the computer lags.
+    pyperclip.copy(text)
+    time.sleep(0.1)
+    
+    pyautogui.hotkey("ctrl", "v")
+
+    print(f"✅ Inserted '{text}' at the current cursor position")
         
 # --------- INSERT TEXT AT LINE -----
 def insert_text_at_line(text_to_insert, line_number):
     win = focus_notepad()
-    if win:
-        click_inside_notepad(win)
-        time.sleep(0.5)
+    if not win:
+        print("❌ Could not find or open Notepad.")
+        return
 
-        # Clear clipboard
-        pyperclip.copy("")
-        time.sleep(0.2)
+    click_inside_notepad(win)
+    time.sleep(0.2)
 
-        # Copy full text
-        pyautogui.hotkey("ctrl", "a")
-        time.sleep(0.3)
-        pyautogui.hotkey("ctrl", "c")
-        time.sleep(0.5)
+    # 1. Clear clipboard with a marker
+    pyperclip.copy("EMPTY_MARKER")
+    time.sleep(0.1)
 
-        text = pyperclip.paste()
+    # 2. Select All and Copy
+    pyautogui.hotkey("ctrl", "a")
+    time.sleep(0.2)
+    pyautogui.hotkey("ctrl", "c")
+    time.sleep(0.4)
 
-        lines = text.split("\n")
+    text = pyperclip.paste()
 
-        if line_number <= len(lines):
-            lines[line_number - 1] += " " + text_to_insert
-        else:
-            print("❌ Invalid line number")
+    # Edge Case: If Notepad is completely empty!
+    if text == "EMPTY_MARKER" or not text.strip():
+        if line_number == 1:
+            pyperclip.copy(text_to_insert)
+            pyautogui.hotkey("ctrl", "v")
+            print(f"✅ Inserted '{text_to_insert}' at line 1 (Blank file)")
             return
+        else:
+            print("⚠️ Notepad is empty! Cannot insert at that line yet.")
+            return
+
+    # Safety: Don't paste Python code
+    if "def " in text and "import " in text:
+        print("⚠️ Warning: Grabbed script code instead of Notepad text. Aborting.")
+        return
+
+    # 3. Process the text in Python
+    # Remove hidden carriage returns (\r) that Windows adds, then split by newline
+    lines = text.replace('\r', '').split("\n")
+
+    # Check if the line exists
+    if 0 < line_number <= len(lines):
+        
+        target_line = lines[line_number - 1]
+        
+        # If the line already has words, add a space before inserting
+        if target_line.strip() == "":
+            lines[line_number - 1] = text_to_insert
+        else:
+            lines[line_number - 1] = target_line + " " + text_to_insert
 
         new_text = "\n".join(lines)
 
-        # Paste updated text
+        # 4. Paste back
         pyperclip.copy(new_text)
         time.sleep(0.2)
-
-        pyautogui.hotkey("ctrl", "a")
-        time.sleep(0.3)
+        
         pyautogui.hotkey("ctrl", "v")
-
-        print(f"Inserted text at line {line_number}")
+        time.sleep(0.2)
+        
+        # Move cursor to end so the screen doesn't jump
+        pyautogui.hotkey("ctrl", "end")
+        
+        print(f"✅ Inserted '{text_to_insert}' at line {line_number}")
+        
+    # Bonus Feature: If they ask for Line 5, but there are only 4 lines, append it!
+    elif line_number == len(lines) + 1:
+        lines.append(text_to_insert)
+        new_text = "\n".join(lines)
+        pyperclip.copy(new_text)
+        time.sleep(0.2)
+        pyautogui.hotkey("ctrl", "v")
+        pyautogui.hotkey("ctrl", "end")
+        print(f"✅ Appended '{text_to_insert}' to new line {line_number}")
+        
+    else:
+        print(f"❌ Invalid line. Document only has {len(lines)} lines.")
    
 # ------ CURSOR MOVE -----
 def move_cursor(direction):
@@ -280,80 +345,108 @@ def new_paragraph():
         pyautogui.press("enter")
         pyautogui.press("enter")
         print("New paragraph added")
-        
-# -------- DELETE WORD FROM LINE ----
+
+# ----- DELETE WORD FROM LINE -----
+
 def delete_word_from_line(word, line_number):
     win = focus_notepad()
-    if win:
-        click_inside_notepad(win)
-        time.sleep(0.5)
+    if not win:
+        print("❌ Could not find or open Notepad.")
+        return
 
-        # Clear clipboard
-        pyperclip.copy("")
-        time.sleep(0.2)
+    # Click to ensure focus
+    click_inside_notepad(win)
+    time.sleep(0.2)
 
-        # Copy all text
-        pyautogui.hotkey("ctrl", "a")
-        time.sleep(0.3)
-        pyautogui.hotkey("ctrl", "c")
-        time.sleep(0.5)
+    # 1. Clear clipboard with a marker
+    pyperclip.copy("EMPTY_MARKER")
+    time.sleep(0.1)
 
-        text = pyperclip.paste()
+    # 2. Select All and Copy to Python
+    pyautogui.hotkey("ctrl", "a")
+    time.sleep(0.2)
+    pyautogui.hotkey("ctrl", "c")
+    time.sleep(0.4)
 
-        if not text.strip():
-            print("There is no text")
-            speak("There is no text")
-            return
+    text = pyperclip.paste()
 
-        lines = text.split("\n")
+    # Safety checks
+    if text == "EMPTY_MARKER" or not text.strip():
+        print("⚠️ Notepad is empty or copy failed.")
+        return
+    if "def " in text and "import " in text:
+        print("⚠️ Warning: Grabbed script code instead of Notepad text. Aborting.")
+        return
 
-        # Check valid line
-        if 0 < line_number <= len(lines):
-            words = lines[line_number - 1].split()
-
-            # remove only matching word
-            words = [w for w in words if w.lower() != word.lower()]
-
-            lines[line_number - 1] = " ".join(words)
-        else:
-            print("❌ Invalid line number")
-            return
-
+    # 3. Process the exact line in Python Memory
+    lines = text.split("\n")
+    
+    # Check if the line number actually exists in the file
+    if 0 < line_number <= len(lines):
+        
+        # Grab the target line (Python lists start at 0, so line 1 is index 0)
+        target_line = lines[line_number - 1]
+        
+        # Split line into words and remove the target word
+        words = target_line.split()
+        new_words = [w for w in words if w.lower() != word.lower()]
+        
+        # Put the line back together
+        lines[line_number - 1] = " ".join(new_words)
+        
+        # Put the whole document back together
         new_text = "\n".join(lines)
-
-        # Paste updated text
+        
+        # 4. Copy and Paste back into Notepad
         pyperclip.copy(new_text)
         time.sleep(0.2)
-
-        pyautogui.hotkey("ctrl", "a")
-        time.sleep(0.3)
+        
         pyautogui.hotkey("ctrl", "v")
-
-        print(f"Deleted '{word}' from line {line_number}")
-                 
-# --------- UNDO --------
+        time.sleep(0.2)
+        
+        # Move cursor to the end so it doesn't jump to the top
+        pyautogui.hotkey("ctrl", "end")
+        
+        print(f"✅ Removed '{word}' from line {line_number}")
+    else:
+        print(f"❌ Invalid line. The document only has {len(lines)} lines.")
+    
+# --------- UNDO (STABILIZED) --------
 def undo_action():
     win = focus_notepad()
     if win:
         click_inside_notepad(win)
-        pyautogui.hotkey("ctrl", "z")
-        print("Undo done")
+        time.sleep(0.2) # ⏳ Wait to guarantee Notepad has focus
 
-# ------ REDO -----------
+        # The interval=0.1 forces Python to hold Ctrl, hold Z, release Z, release Ctrl.
+        pyautogui.hotkey("ctrl", "z", interval=0.1)
+        print("✅ Undo executed")
+
+# ------ REDO (STABILIZED) -----------
 def redo_action():
     win = focus_notepad()
     if win:
         click_inside_notepad(win)
-        pyautogui.hotkey("ctrl", "y")
-        print("Redo done")
+        time.sleep(0.2)
+
+        # In Windows 11, Redo is standard as Ctrl+Y 
+        pyautogui.hotkey("ctrl", "y", interval=0.1)
+        print("✅ Redo executed")
                    
 # -------- CLEAR --------
 def clear_notepad():
     win = focus_notepad()
     if win:
         click_inside_notepad(win)
+        time.sleep(0.2) # Add a small delay to ensure focus
+        
+        # Select all text
         pyautogui.hotkey("ctrl", "a")
-        pyautogui.press("delete")
+        time.sleep(0.2) # Wait for selection
+        
+        # Press backspace (often more reliable than delete in Notepad)
+        pyautogui.press("backspace") 
+        print("✅ Notepad cleared")
 
 
 # -------- DELETE LINE --------
@@ -362,6 +455,19 @@ def delete_line():
     if win:
         pyautogui.hotkey("ctrl", "a")
         pyautogui.press("delete")
+        
+# ----- PRESS SPACE -----
+def press_space():
+    win = focus_notepad()
+    if not win:
+        print("❌ Could not find or open Notepad.")
+        return
+
+    # Just a tiny pause to let Windows focus settle, no clicking!
+    time.sleep(0.2) 
+    
+    pyautogui.press("space")
+    print("✅ Pressed Space")
 
 
 # -------- MAIN COMMAND HANDLER --------

@@ -1,0 +1,189 @@
+import os
+import time
+import pyautogui
+import pygetwindow as gw
+import pyperclip
+
+pyautogui.FAILSAFE = True
+
+
+# ===== OPEN WHATSAPP =====
+def open_whatsapp():
+    os.system("start shell:AppsFolder\\5319275A.WhatsAppDesktop_cv1g1gvanyjgm!App")
+    time.sleep(3)
+
+
+# ===== FOCUS WINDOW =====
+def focus_whatsapp():
+    windows = gw.getWindowsWithTitle("WhatsApp")
+    if windows:
+        windows[0].activate()
+        time.sleep(1)
+
+
+# ===== CLEAR SEARCH =====
+def clear_search():
+    pyautogui.hotkey("ctrl", "f")
+    time.sleep(1)
+    pyautogui.hotkey("ctrl", "a")
+    pyautogui.press("backspace")
+
+
+# ===== SEARCH CONTACT =====
+def search_contact(name):
+    pyautogui.write(name, interval=0.05)
+    time.sleep(2)
+    pyautogui.press("enter")
+    time.sleep(2)
+
+
+# ===== SEND MESSAGE =====
+def send_message(message):
+    pyautogui.write(message, interval=0.03)
+    pyautogui.press("enter")
+
+
+# ===== VOICE CALL =====
+def video_call():
+    pyautogui.press("esc")
+    time.sleep(0.5)
+
+    for _ in range(9):   # one step after voice call
+        pyautogui.press("tab")
+        time.sleep(0.2)
+
+    pyautogui.press("enter")
+    print("🎥 Video calling...")
+
+
+# ===== VIDEO CALL =====
+def voice_call():
+    # Move focus to top bar
+    pyautogui.press("esc")
+    time.sleep(0.5)
+
+    # Navigate to call button (adjust if needed)
+    for _ in range(8):   # try 7–10 depending on system
+        pyautogui.press("tab")
+        time.sleep(0.2)
+
+    pyautogui.press("enter")
+    print("📞 Calling...")
+
+
+# ===== GET LAST SCREENSHOT =====
+def get_last_screenshot():
+    folder = os.path.join(os.path.expanduser("~"), "Pictures", "Screenshots")
+
+    if not os.path.exists(folder):
+        print("❌ Screenshot folder not found")
+        return None
+
+    files = [os.path.join(folder, f) for f in os.listdir(folder)]
+    files = [f for f in files if os.path.isfile(f)]
+
+    if not files:
+        print("❌ No screenshots found")
+        return None
+
+    return max(files, key=os.path.getctime)
+
+
+# ===== SEND LAST SCREENSHOT =====
+def send_last_screenshot():
+    file_path = get_last_screenshot()
+
+    if not file_path:
+        return
+
+    print("📸 Sending:", file_path)
+
+    pyperclip.copy(file_path)
+    time.sleep(1)
+
+    # Open attach menu
+    pyautogui.press("esc")
+    time.sleep(0.5)
+
+    for _ in range(6):
+        pyautogui.press("tab")
+        time.sleep(0.2)
+
+    pyautogui.press("enter")  # open menu
+    time.sleep(1)
+
+    pyautogui.press("down")   # photos
+    pyautogui.press("enter")
+    time.sleep(2)
+
+    # paste file path
+    for _ in range(4):
+        pyautogui.press("tab")
+        time.sleep(0.3)
+
+    pyautogui.hotkey("ctrl", "v")
+    time.sleep(1)
+
+    pyautogui.press("enter")
+    time.sleep(2)
+
+    pyautogui.press("enter")
+
+    print("📎 Screenshot sent")
+
+
+# ===== MAIN LOOP =====
+while True:
+    command = input("\nSay: ").lower().strip()
+
+    if command == "exit":
+        break
+
+    if "send" in command and "to" in command:
+        name = command.split("to")[-1].strip()
+        message = command.split("to")[0].replace("send", "").strip()
+
+        open_whatsapp()
+        focus_whatsapp()
+        clear_search()
+        search_contact(name)
+
+        send_message(message)
+        print(f"✅ Message sent to {name}")
+
+
+    elif "call" in command:
+        name = command.replace("call", "").strip()
+
+        open_whatsapp()
+        focus_whatsapp()
+        clear_search()
+        search_contact(name)
+
+        voice_call()
+
+
+    elif "video call" in command:
+        name = command.replace("video call", "").strip()
+
+        open_whatsapp()
+        focus_whatsapp()
+        clear_search()
+        search_contact(name)
+
+        video_call()
+
+
+    elif "send screenshot" in command:
+        name = command.replace("send screenshot to", "").strip()
+
+        open_whatsapp()
+        focus_whatsapp()
+        clear_search()
+        search_contact(name)
+
+        send_last_screenshot()
+
+
+    else:
+        print("❌ Try: send hi to mummy / call mummy / video call mummy / send screenshot to mummy")

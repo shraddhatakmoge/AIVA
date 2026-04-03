@@ -1,14 +1,17 @@
 import re
+import os
 
 def process_nlp(command):
     cmd = command.lower()
 
-    # 🔥 BRAIN POLISH: Remove conversational filler words
-    fillers = ["please", "jarvis", "can you", "could you", "i want to", "just", "kindly", "hey", "send a"]
-    for word in fillers:
-        cmd = cmd.replace(word, "")
+    # 🔥 FIXED: Use \b (word boundaries) so 'jarvis' in a filename isn't deleted
+    fillers = ["please", "jarvis", "can you", "could you", "i want to", "just", "kindly", "hey"]
     
-    # Clean up any weird double spaces we accidentally created
+    for word in fillers:
+        # This only replaces the word if it's a standalone word
+        cmd = re.sub(rf'\b{word}\b', '', cmd)
+    
+    # Clean up any weird double spaces created by removal
     cmd = re.sub(' +', ' ', cmd).strip()
 
     result = {
@@ -387,7 +390,19 @@ def process_nlp(command):
             filename = words[-1] + ".txt" if ".txt" not in words[-1] else words[-1]
             return {"app": "notepad", "action": "save", "text": filename}
 
-    # ➕ INSERT / ADD text at cursor
+    # 1️⃣ INSERT TEXT AT SPECIFIC LINE (Check this FIRST!)
+    elif ("insert" in cmd or "add" in cmd) and "line" in cmd:
+        # Matches: "insert [text] at line [number]" or "add [text] on line [number]"
+        match = re.search(r"(?:insert|add) (.*?) (?:at|in|on) line (\d+)", cmd)
+        if match:
+            return {
+                "app": "notepad",
+                "action": "insert",
+                "text": match.group(1).strip(),
+                "line": int(match.group(2).strip())
+            }
+
+    # 2️⃣ GENERIC INSERT AT CURSOR (Check this SECOND!)
     elif "insert" in cmd or "add" in cmd:
         match = re.search(r"(?:insert|add) (.*)", cmd)
         return {
@@ -395,8 +410,25 @@ def process_nlp(command):
             "action": "insert",
             "text": match.group(1).strip() if match else None
         }
+        
+    elif cmd == "clear" or "clear notepad" in cmd:
+        return {
+            "app": "notepad",
+            "action": "clear"
+        }
 
-    # 🗑️ DELETE WORD
+    # 1. Specific Rule (Line Number) - CHECK THIS FIRST
+    elif ("delete" in cmd or "remove" in cmd) and "line" in cmd:
+        match = re.search(r"(?:delete|remove) (?:word )?(.*?) from line (\d+)", cmd)
+        if match:
+            return {
+                "app": "notepad",
+                "action": "delete",
+                "text": match.group(1).strip(),
+                "line": int(match.group(2).strip())
+            }
+
+    # 2. Generic Rule - CHECK THIS SECOND
     elif "delete" in cmd or "remove" in cmd:
         match = re.search(r"(?:delete|remove) word (.*)", cmd)
         return {
@@ -404,7 +436,29 @@ def process_nlp(command):
             "action": "delete",
             "text": match.group(1).strip() if match else None
         }
+        
+    # ␣ PRESS SPACE
+    elif cmd == "space" or cmd == "add space":
+        return {
+            "app": "notepad",
+            "action": "space"
+        }
 
+    # 🔙 UNDO ACTION
+    elif "undo" in cmd:
+        return {
+            "app": "notepad",
+            "action": "undo"
+        }
+
+    # 🔙 REDO ACTION
+    elif "redo" in cmd:
+        return {
+            "app": "notepad",
+            "action": "redo"
+        }
+        
+    
     # 🧭 NAVIGATION & FORMATTING
     elif "move" in cmd:
         for direction in ["left", "right", "up", "down"]:
@@ -428,7 +482,47 @@ def process_nlp(command):
             # Remove the app name from the command so it doesn't get caught as text!
             cmd = cmd.replace(f"in {a}", "").replace(f"on {a}", "").replace(a, "").strip()
 
+# =========================================
+    # 📂 FILE & FOLDER OPERATIONS (NEW)
+    # =========================================
+    
+    # 📁 CREATE FOLDER
+    if "create folder" in cmd or "make folder" in cmd:
+        name = cmd.replace("create folder", "").replace("make folder", "").strip()
+        return {
+            "app": "file_system",
+            "intent": "create_folder",
+            "entities": {"path": name}
+        }
 
+    # 📄 CREATE FILE
+    elif "create file" in cmd:
+        name = cmd.replace("create file", "").strip()
+        return {
+            "app": "file_system",
+            "intent": "create_file",
+            "entities": {"path": name}
+        }
+
+    # 🔍 SEARCH FILE
+    elif "search for" in cmd or "find file" in cmd:
+        name = cmd.replace("search for", "").replace("find file", "").strip()
+        return {
+            "app": "file_system",
+            "intent": "search_file",
+            # We default to searching the whole User directory if not specified
+            "entities": {"filename": name, "directory": os.path.expanduser("~")}
+        }
+
+    # 🗑️ DELETE FILE/FOLDER
+    elif "delete" in cmd and ("file" in cmd or "folder" in cmd):
+        name = cmd.replace("delete file", "").replace("delete folder", "").strip()
+        intent = "delete_file" if "file" in cmd else "delete_folder"
+        return {
+            "app": "file_system",
+            "intent": intent,
+            "entities": {"path": name}
+        }
 
     # DEFAULT APP FALLBACK
     if result["app"] is None:

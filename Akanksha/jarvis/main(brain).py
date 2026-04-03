@@ -7,7 +7,7 @@ from apps.spotify import *
 from apps.whatsapp import *
 from common import find_document, resolve_contact
 from nlp import process_nlp
-
+from services.file_service import handle_file_command
 
 import pygetwindow as gw
 import time
@@ -43,7 +43,6 @@ def get_active_app():
 def execute_action(data, original_command=""):
     """
     Takes a parsed data dict and runs the correct app function.
-    Used by both NLP path and LLM fallback path.
     """
     app = data.get("app")
     action = data.get("action")
@@ -51,6 +50,27 @@ def execute_action(data, original_command=""):
     line = data.get("line")
     direction = data.get("direction")
     contact = data.get("contact")
+
+    # ==============================
+    # 📂 FILE SYSTEM (NEW)
+    # ==============================
+    if app == "file_system":
+        intent = data.get("intent")
+        entities = data.get("entities")
+
+        # Call your professional file_service!
+        result = handle_file_command(intent, entities)
+
+        if result["status"] == "success":
+            print(f"✅ JARVIS: {result['message']}")
+            if intent == "search_file" and result["data"]:
+                print("Found matches:")
+                for path in result["data"]:
+                    print(f" - {path}")
+        else:
+            print(f"❌ JARVIS: {result['message']}")
+
+        return True
 
     # ==============================
     # 📝 NOTEPAD
@@ -62,15 +82,9 @@ def execute_action(data, original_command=""):
 
         elif action == "write":
             write_text(text)
-
-        elif action == "insert":
-            insert_at_cursor(text)
-
-        elif action == "delete":
-            if line:
-                delete_word_from_line(text, line)
-            else:
-                delete_word(text)
+            
+        elif action == "space":
+            press_space()
 
         elif action == "move":
             move_cursor(direction)
@@ -80,6 +94,21 @@ def execute_action(data, original_command=""):
 
         elif action == "new_paragraph":
             new_paragraph()
+            
+        elif action == "undo":
+            undo_action()
+        
+        elif action == "redo":
+            redo_action()
+            
+        elif action == "clear":
+            clear_notepad()
+        
+        elif action == "delete":
+            if line:
+                delete_word_from_line(text, line)
+            else:
+                delete_word(text)
 
         elif action == "read":
             # 1. Try to find any window with "Notepad" in the title
@@ -108,34 +137,8 @@ def execute_action(data, original_command=""):
             new_word = data.get("new_text")
             
             if old_word and new_word:
-                try:
-                    # 1. Bring Notepad to focus
-                    notepad_windows = gw.getWindowsWithTitle('Notepad')
-                    if notepad_windows:
-                        notepad_win = notepad_windows[0]
-                        notepad_win.activate()
-                        time.sleep(0.5)
-                    
-                    # 2. Open Replace Menu
-                    pyautogui.hotkey('ctrl', 'h')
-                    time.sleep(0.5)
-                    
-                    # 3. Type words (as seen in your screenshot)
-                    pyautogui.write(old_word)
-                    pyautogui.press('tab')
-                    pyautogui.write(new_word)
-                    time.sleep(0.3)
-                    
-                    # 4. 🔥 THE FIX: Press Enter to click "Replace" 
-                    # Or use 'alt', 'a' if you want to "Replace All"
-                    pyautogui.press('enter') 
-                    time.sleep(0.3)
-                    
-                    # 5. Close the menu so you can keep typing
-                    pyautogui.press('esc') 
-                    print(f"✅ Replacement complete: {old_word} -> {new_word}")
-                except Exception as e:
-                    print(f"❌ Replacement failed: {e}")
+                # This calls the fast clipboard function we just wrote in notepad.py!
+                replace_word(old_word, new_word)
             
         elif action == "new":
             active_app = get_active_app()
@@ -143,6 +146,14 @@ def execute_action(data, original_command=""):
                 pyautogui.hotkey('ctrl', 'n')
             else:
                 open_notepad()
+                
+        elif action == "insert":
+            if line:
+                insert_text_at_line(text, line)
+            else:
+                insert_at_cursor(text)
+                
+                
 
         elif action == "close":
             close_notepad()
@@ -352,33 +363,34 @@ def is_nlp_confident(data):
 # ==============================
 # 🚀 MAIN COMMAND PROCESSOR
 # ==============================
+# ==============================
+# 🚀 MAIN COMMAND PROCESSOR
+# ==============================
 def process_command(command):
     command = command.lower().strip()
 
-    # 1. System/Global commands first (Mute/Stop)
+    # 1. System/Global commands first
     if "mute" in command and "call" not in command:
         toggle_mic()
+        return
+
+    if command == "stop":
+        from apps.whatsapp import stop_voice_message
+        stop_voice_message()
         return
 
     # 2. Let NLP handle EVERYTHING else
     nlp_data = process_nlp(command)
     
-    if is_nlp_confident(nlp_data):
-        # execute_action handles window focus and calling notepad.py functions
-        if execute_action(nlp_data, command):
-            return
+    # 3. Print the raw NLP result (You can delete this too if you don't want to see the dictionary!)
+    print(f"📊 NLP result: {nlp_data}")
 
-    print("❌ Command not recognized")
-    
-    # -------- NLP ONLY --------
-    nlp_data = process_nlp(command)
-    print("📊 NLP result:", nlp_data)
-
+    # 4. Run the action
     if is_nlp_confident(nlp_data):
         if execute_action(nlp_data, command):
             return
 
-    # -------- NOTHING WORKED --------
+    # 5. If it gets here, it failed.
     print("❌ Command not recognized")
 
 # ==============================
