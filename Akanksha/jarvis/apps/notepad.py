@@ -60,10 +60,17 @@ def click_inside_notepad(win):
 
 # -------- WRITE --------
 def write_text(text):
-    win = focus_notepad()
+    win = focus_notepad() # Get the window object
     if win:
-        click_inside_notepad(win)
-        pyautogui.write(text, interval=0.05)
+        # Click the middle of the Notepad window to set the cursor
+        x = win.left + win.width // 2
+        y = win.top + win.height // 2
+        pyautogui.click(x, y)
+        time.sleep(0.2)
+        
+        # Now type
+        pyautogui.write(text, interval=0.01)
+        print(f"✅ Typed: {text}")
 
 # ------ NEW FILe ------
 def new_file():

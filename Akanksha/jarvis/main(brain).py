@@ -76,10 +76,15 @@ def execute_action(data, original_command=""):
     # 📝 NOTEPAD
     # ==============================
     if app == "notepad":
+        # 🔥 CRITICAL: Always focus Notepad before doing anything
+        win = focus_notepad() 
+        if not win:
+            print("❌ Notepad could not be found or opened.")
+            return
 
         if action == "open":
             open_notepad()
-
+            
         elif action == "write":
             write_text(text)
             
@@ -130,7 +135,9 @@ def execute_action(data, original_command=""):
                 print("❌ Notepad not active. Please click the Notepad window first!")
                 
         elif action == "save":
-            save_file(text or "test.txt")
+            # If the NLP found a filename, use it. Otherwise, default to test.txt
+            filename_to_use = text if text else "test.txt"
+            save_file(filename_to_use)
             
         elif action == "replace":
             old_word = data.get("old_text")
@@ -363,36 +370,45 @@ def is_nlp_confident(data):
 # ==============================
 # 🚀 MAIN COMMAND PROCESSOR
 # ==============================
-# ==============================
-# 🚀 MAIN COMMAND PROCESSOR
-# ==============================
+import re
+
 def process_command(command):
+    # Standardize input
     command = command.lower().strip()
 
-    # 1. System/Global commands first
-    if "mute" in command and "call" not in command:
-        toggle_mic()
-        return
-
+    # 1. Global Commands
     if command == "stop":
         from apps.whatsapp import stop_voice_message
         stop_voice_message()
         return
 
-    # 2. Let NLP handle EVERYTHING else
-    nlp_data = process_nlp(command)
+    # 2. Split the sentence into multiple parts
+    parts = re.split(r'\b(?:and then|then|and)\b', command)
     
-    # 3. Print the raw NLP result (You can delete this too if you don't want to see the dictionary!)
-    print(f"📊 NLP result: {nlp_data}")
+    for part in parts:
+        part = part.strip().strip(',').strip('.') 
+        if not part: continue
+        
+        print(f"🤖 JARVIS processing: {part}")
 
-    # 4. Run the action
-    if is_nlp_confident(nlp_data):
-        if execute_action(nlp_data, command):
-            return
+        # --- THIS IS THE MISSING STEP ---
+        # 3. Analyze THIS specific part of the sentence
+        nlp_data = process_nlp(part) 
+        
+        # 4. Contextual Check
+        # If no app was found, but Notepad is active, assume Notepad
+        if nlp_data.get("app") is None:
+            active = get_active_app()
+            if active == "notepad":
+                nlp_data["app"] = "notepad"
 
-    # 5. If it gets here, it failed.
-    print("❌ Command not recognized")
-
+        # 5. Validate and Execute
+        if is_nlp_confident(nlp_data):
+            execute_action(nlp_data, part)
+            # Prevent text from "smushing" together
+            time.sleep(0.3) 
+        else:
+            print(f"❌ JARVIS: I couldn't understand '{part}'")
 # ==============================
 # ▶️ RUN
 # ==============================
