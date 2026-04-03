@@ -15,7 +15,6 @@ import pyautogui
 
 pyautogui.FAILSAFE = False
 
-
 def toggle_mic():
     pyautogui.hotkey("win", "alt", "k")
 
@@ -376,13 +375,7 @@ def process_command(command):
     # Standardize input
     command = command.lower().strip()
 
-    # 1. Global Commands
-    if command == "stop":
-        from apps.whatsapp import stop_voice_message
-        stop_voice_message()
-        return
-
-    # 2. Split the sentence into multiple parts
+    # Split the sentence into multiple parts
     parts = re.split(r'\b(?:and then|then|and)\b', command)
     
     for part in parts:
@@ -390,25 +383,20 @@ def process_command(command):
         if not part: continue
         
         print(f"🤖 JARVIS processing: {part}")
-
-        # --- THIS IS THE MISSING STEP ---
-        # 3. Analyze THIS specific part of the sentence
         nlp_data = process_nlp(part) 
         
-        # 4. Contextual Check
-        # If no app was found, but Notepad is active, assume Notepad
+        # Contextual Check
         if nlp_data.get("app") is None:
             active = get_active_app()
             if active == "notepad":
                 nlp_data["app"] = "notepad"
 
-        # 5. Validate and Execute
+        # Validate and Execute
         if is_nlp_confident(nlp_data):
             execute_action(nlp_data, part)
-            # Prevent text from "smushing" together
-            time.sleep(0.3) 
-        else:
-            print(f"❌ JARVIS: I couldn't understand '{part}'")
+            # 🔥 INCREASE DELAY to 0.5 to stop the 'smushing'
+            time.sleep(0.5)
+            
 # ==============================
 # ▶️ RUN
 # ==============================
