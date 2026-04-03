@@ -12,3 +12,6 @@ features/browser/memory/
 # 🔐 Secrets (DO NOT UPLOAD)
 credentials.json
 token.pickle
+
+chrome_profile/
+Shra/features/tests/chrome_profile/

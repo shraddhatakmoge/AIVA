@@ -436,130 +436,59 @@ class WhatsApp:
             # OPEN CHAT
             if not self._open_chat_by_contact_name(contact_name):
                 return {"status": "error", "response": "Contact not found"}
+            # 🔥 CRITICAL FIX: ensure chat is FULLY READY
+            try:
+                WebDriverWait(self.driver, 15).until(
+                    EC.presence_of_element_located(
+                        (By.XPATH, "//footer//div[@contenteditable='true']")
+                    )
+                )
+                print("✅ Chat fully loaded")
+            except:
+                return {
+                    "status": "error",
+                    "response": "Chat not ready after opening"
+                }
 
             time.sleep(2)
 
-            # CLICK ATTACH BUTTON
-            attach_btn = None
-            attach_xpaths = [
-                "//span[@data-icon='clip']",
-                "//span[@data-icon='attach-menu-plus']",
-                "//button[@aria-label='Attach']",
-                "//div[@aria-label='Attach']",
-            ]
+            # 🔥 DIRECT FILE INPUT (NO ATTACH CLICK, NO DOCUMENT CLICK)
 
-            for xpath in attach_xpaths:
+            # 🔥 FIND ALL FILE INPUTS AND PICK CORRECT ONE
+
+            inputs = WebDriverWait(self.driver, 10).until(
+                EC.presence_of_all_elements_located((By.XPATH, "//input[@type='file']"))
+            )
+
+            file_input = None
+
+            for inp in inputs:
                 try:
-                    elements = self.driver.find_elements(By.XPATH, xpath)
-                    for el in elements:
-                        if el.is_displayed():
-                            self.driver.execute_script("arguments[0].click();", el)
-                            attach_btn = el
-                            break
-                    if attach_btn:
+                    accept = (inp.get_attribute("accept") or "").lower()
+
+                    # 🔥 pick DOCUMENT input (not image/video)
+                    if "image" not in accept and "video" not in accept:
+                        file_input = inp
                         break
                 except:
                     continue
 
-            if not attach_btn:
-                return {"status": "error", "response": "Attach button not found"}
+            # fallback
+            if not file_input:
+                file_input = inputs[-1]
 
-            time.sleep(1)
-            # 🔥 FINAL ROBUST DOCUMENT CLICK (WORKS IN ALL UI VARIANTS)
-            doc_clicked = False
-            end_time = time.time() + 10
-
-            while time.time() < end_time:
-                try:
-                    # 🔥 get ALL clickable menu items
-                    items = self.driver.find_elements(
-                        By.XPATH,
-                        "//*[@role='button' and .//span]"
-                    )
-
-                    for item in items:
-                        try:
-                            if not item.is_displayed():
-                                continue
-
-                            text = (item.text or "").lower()
-
-                            # ✅ primary: text match
-                            if "document" in text:
-                                self.driver.execute_script("arguments[0].click();", item)
-                                doc_clicked = True
-                                break
-
-                            # ✅ secondary: icon match
-                            icons = item.find_elements(By.XPATH, ".//span[contains(@data-icon,'document')]")
-                            if icons:
-                                self.driver.execute_script("arguments[0].click();", item)
-                                doc_clicked = True
-                                break
-
-                        except:
-                            continue
-
-                    if doc_clicked:
-                        break
-
-                except:
-                    pass
-
-                time.sleep(0.5)
-
-            # 🔥 FINAL FALLBACK (VERY IMPORTANT)
-            if not doc_clicked:
-                try:
-                    items = self.driver.find_elements(By.XPATH, "//*[@role='button']")
-
-                    # usually order: Photo | Document | Camera
-                    if len(items) >= 3:
-                        self.driver.execute_script("arguments[0].click();", items[1])  # Document
-                        doc_clicked = True
-                except:
-                    pass
-
-            if not doc_clicked:
-                return {"status": "error", "response": "Document option STILL not clickable"}
-
-            time.sleep(1.5)
-            if not doc_clicked:
-                # 🔥 FINAL FALLBACK: click 2nd option blindly (works in most UIs)
-                try:
-                    items = self.driver.find_elements(By.XPATH, "//li[@role='button']")
-                    if len(items) >= 2:
-                        self.driver.execute_script("arguments[0].click();", items[1])
-                        doc_clicked = True
-                except:
-                    pass
-
-            if not doc_clicked:
-                return {"status": "error", "response": "Document option STILL not clicked"}
-
-            time.sleep(1.5)
-
-            # 🔥 DIRECT FILE UPLOAD (FINAL FIX)
-
-            # 🔥 PICK CORRECT FILE INPUT (LAST ONE = ACTIVE ONE)
-            inputs = self.driver.find_elements(By.XPATH, "//input[@type='file']")
-
-            if not inputs:
-                return {"status": "error", "response": "No file input found"}
-
-            file_input = inputs[-1]  # 🔥 THIS IS THE FIX
-
-            # 🔥 MAKE INPUT VISIBLE (IMPORTANT)
+            # make usable
             self.driver.execute_script("""
                 arguments[0].style.display = 'block';
                 arguments[0].style.visibility = 'visible';
-                arguments[0].style.height = '1px';
-                arguments[0].style.width = '1px';
             """, file_input)
 
-            # 🔥 SEND FILE (MISSING PART)
             file_input.send_keys(file_path)
-            print("✅ File uploaded via direct input")
+
+            print("✅ File uploaded via correct input")
+
+
+
 
             time.sleep(2)
 
@@ -574,29 +503,74 @@ class WhatsApp:
 
 
 
-            # 🔥 VERIFY FILE ACTUALLY SENT (STRICT)
-            # 🔥 CLICK SEND BUTTON FIRST
             # 🔥 WAIT FOR FILE TO ATTACH
             time.sleep(2)
 
             # 🔥 FOCUS MESSAGE BOX (CRITICAL FIX)
-            try:
-                message_box = self._find_message_box(timeout=5)
-                self.driver.execute_script("arguments[0].click();", message_box)
-                time.sleep(0.3)
-            except:
-                pass
 
-            # 🔥 SEND USING ENTER (FINAL RELIABLE METHOD)
             try:
-                ActionChains(self.driver).send_keys(Keys.ENTER).perform()
+                # 🔥 WAIT FOR FILE PREVIEW USING FILE NAME (RELIABLE)
+
+                file_name_only = os.path.basename(file_path)
+
+                try:
+                    WebDriverWait(self.driver, 10).until(
+                        EC.presence_of_element_located(
+                            (By.XPATH, f"//*[contains(text(), '{file_name_only}')]")
+                        )
+                    )
+                    print("✅ REAL file preview opened (file visible)")
+                except:
+                    return {
+                        "status": "error",
+                        "response": "File preview did not open properly"
+                    }
+
+                time.sleep(1.5)
+            except:
+                return {
+                    "status": "error",
+                    "response": "File preview did not open properly"
+                }
+
+            time.sleep(1.5)
+
+            time.sleep(1)
+
+            # 🔥 SEND FILE USING ENTER (ON MODAL, NOT MESSAGE BOX)
+            # 🔥 CLICK REAL SEND BUTTON (BOTTOM RIGHT)
+
+            try:
+                send_btn = WebDriverWait(self.driver, 10).until(
+                    EC.element_to_be_clickable(
+                        (By.XPATH, "//span[@data-icon='send']")
+                    )
+                )
+
+                # ensure it's the bottom send button
+                for btn in self.driver.find_elements(By.XPATH, "//span[@data-icon='send']"):
+                    try:
+                        if btn.is_displayed():
+                            y = btn.location.get("y", 0)
+
+                            # 🔥 ONLY CLICK LOWER SCREEN BUTTON
+                            if y > 300:
+                                from selenium.webdriver.common.action_chains import ActionChains
+
+                                ActionChains(self.driver).move_to_element(btn).pause(0.2).click().perform()
+
+                                print("🚀 File sent via REAL CLICK")
+                                break
+                    except:
+                        continue
+
                 time.sleep(2)
+
             except Exception as e:
                 return {
                     "status": "error",
-                    "response": f"Could not send file using ENTER: {str(e)}"
+                    "response": f"Send button click failed: {e}"
                 }
-
             # 🔥 WAIT UNTIL MODAL CLOSES (VERY IMPORTANT)
             try:
                 WebDriverWait(self.driver, 5).until_not(
@@ -611,23 +585,8 @@ class WhatsApp:
             if not sent:
                 return {
                     "status": "error",
-                    "response": "File was NOT sent (send button click failed or UI issue)"
+                    "response": "File upload attempted but NOT confirmed sent"
                 }
-
-            print("🚀 REAL FILE SENT")
-
-            return {
-                "status": "success",
-                "response": f"File sent to {contact_name}"
-            }
-            # 🔥 VERIFY FILE REALLY SENT
-            if not self._wait_for_sent_document(file_path, timeout=15):
-                return {
-                    "status": "error",
-                    "response": "Send button clicked but file NOT sent."
-                }
-
-            print("🚀 REAL FILE SENT")
 
             return {
                 "status": "success",

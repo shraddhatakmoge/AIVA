@@ -26,6 +26,14 @@ class YouTube:
     def _safe_get(self, url):
         try:
             time.sleep(1.5)
+            # 🔥 FORCE SAFE TAB LOAD
+            current_handles = self.driver.window_handles
+            current_tab = self.driver.current_window_handle
+
+            # ensure we are in correct tab
+            if current_tab != current_handles[-1]:
+                self.driver.switch_to.window(current_handles[-1])
+
             self.driver.get(url)
         except:
             print("⚠️ Page load timeout, stopping...")
@@ -47,8 +55,11 @@ class YouTube:
     # -------------------------------------------------
     # OPEN
     # -------------------------------------------------
-    def open(self):
-        # 🔥 replaced driver.get with safe_get (no behavior change)
+    def open(self, tab_handle=None):
+
+        if tab_handle:
+            self.driver.switch_to.window(tab_handle)
+
         self._safe_get(self.get_url())
         bring_browser_to_front()
 

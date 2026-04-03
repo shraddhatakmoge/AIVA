@@ -14,19 +14,7 @@ from AIVA.Shra.features.browser.platforms.whatsapp import WhatsApp
 from AIVA.Shra.features.browser.window_focus import bring_browser_to_front
 
 
-def find_file_by_name(filename):
-    search_dirs = [
-        os.path.join(os.path.expanduser("~"), "Downloads"),
-        os.path.join(os.path.expanduser("~"), "Documents"),
-        os.path.join(os.path.expanduser("~"), "Desktop")
-    ]
 
-    matches = []
-
-    for folder in search_dirs:
-        matches.extend(glob.glob(os.path.join(folder, f"*{filename}*")))
-
-    return matches
 
 
 class BrowserController:
@@ -37,6 +25,7 @@ class BrowserController:
         self.tabs = {}
         self.last_active_platform = None
         self.pending_email = None
+        self.previous_tab = None  # 🔥 NEW
 
     # -------------------------------------------------
     # ENSURE DRIVER
@@ -91,6 +80,21 @@ class BrowserController:
     # -------------------------------------------------
     # SWITCH TAB
     # -------------------------------------------------
+
+    def find_file_by_name(filename):
+        search_dirs = [
+            os.path.join(os.path.expanduser("~"), "Downloads"),
+            os.path.join(os.path.expanduser("~"), "Documents"),
+            os.path.join(os.path.expanduser("~"), "Desktop")
+        ]
+
+        matches = []
+
+        for folder in search_dirs:
+            matches.extend(glob.glob(os.path.join(folder, f"*{filename}*")))
+
+        return matches
+
     def _switch_to_tab(self, target):
 
         handle = self.tabs.get(target)
@@ -100,6 +104,9 @@ class BrowserController:
 
         try:
             if handle in self.driver.window_handles:
+                # 🔥 STORE PREVIOUS TAB BEFORE SWITCHING
+                self.previous_tab = self.driver.current_window_handle
+
                 self.driver.switch_to.window(handle)
                 self.last_active_platform = target
                 bring_browser_to_front()
@@ -110,6 +117,22 @@ class BrowserController:
         except WebDriverException:
             self.tabs.pop(target, None)
             return False
+
+    def switch_to_previous_tab(self):
+
+        if self.previous_tab and self.previous_tab in self.driver.window_handles:
+            self.driver.switch_to.window(self.previous_tab)
+            bring_browser_to_front()
+
+            return {
+                "status": "success",
+                "response": "Switched back to previous tab"
+            }
+
+        return {
+            "status": "error",
+            "response": "No previous tab found"
+        }
 
     # -------------------------------------------------
     # NORMALIZE ACTION
@@ -577,6 +600,8 @@ You can say:
                 "response": "Invalid command structure."
             }
 
+
+
         # MULTI ACTION SUPPORT
         if "actions" in structured:
             results = []
@@ -592,6 +617,22 @@ You can say:
         action = structured.get("action")
         query = structured.get("query")
 
+        # 🔥 HANDLE NON-PLATFORM ACTIONS FIRST
+
+        if action == "switch_back":
+            return self.switch_to_previous_tab()
+
+        if action == "switch_to_google":
+            if "google" in self.tabs:
+                self._switch_to_tab("google")
+                return {
+                    "status": "success",
+                    "response": "Switched to Google"
+                }
+            return {
+                "status": "error",
+                "response": "Google tab not found"
+            }
         # ✅ READ EMAIL HANDLER
         if action == "read_latest_email":
             gmail = Gmail(None)
@@ -604,6 +645,18 @@ You can say:
             }
 
         target = self._detect_target(structured)
+        # 🔥 FORCE GOOGLE TAB FOR SEARCH (CORRECT POSITION)
+        if action == "search" and target == "google":
+
+            self._ensure_driver()
+
+            if "google" in self.tabs:
+                self._switch_to_tab("google")
+            else:
+                self._open_new_tab("google")
+
+            platform = self.platform_instances["google"]
+            return platform.search(query)
 
         # 🔥 FIX: sync structured with actual target
         structured["target"] = target
@@ -736,9 +789,28 @@ You can say:
             if open_result.get("status") not in ["success", "login_required"]:
                 return open_result
         else:
-            self._switch_to_tab(target)
+            if action not in ["scroll"]:
+                self._switch_to_tab(target)
 
         # EXECUTE
+        # 🔥 SPECIAL FIX FOR SCROLL (ALWAYS CURRENT TAB)
+        if action == "scroll":
+
+            direction = "down"
+            if isinstance(query, dict):
+                direction = query.get("direction", "down")
+
+            if direction == "down":
+                self.driver.execute_script("window.scrollBy(0, 600);")
+            else:
+                self.driver.execute_script("window.scrollBy(0, -600);")
+
+            return {
+                "status": "success",
+                "response": f"Scrolled {direction}"
+            }
+
+        # NORMAL EXECUTION
         if just_opened and action == "play":
             result = platform.play(query)
         else:

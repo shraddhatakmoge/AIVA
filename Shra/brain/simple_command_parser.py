@@ -90,6 +90,22 @@ class SimpleCommandParser:
         original_command = command.strip()
         lower_command = command.lower().strip()
 
+        # 🔥 ADD THIS (DO NOT REMOVE ANYTHING ELSE)
+        if "go back to website" in lower_command or "switch back" in lower_command or lower_command == "go back":
+            return {
+                "status": "success",
+                "action": "switch_back",
+                "target": "browser"  # 🔥 IMPORTANT FIX
+            }
+
+        if "go back to google" in lower_command or "switch to google" in lower_command:
+            return {
+                "status": "success",
+                "action": "switch_to_google",
+                "target": "google"
+            }
+
+
         if " and " in lower_command:
             parts = [p.strip() for p in original_command.split(" and ")]
             actions = []
@@ -134,16 +150,65 @@ class SimpleCommandParser:
                 "status": "success",
                 "action": "play_yesterday"
             }
+        if "open first result" in lower_command:
+            return {
+                "status": "success",
+                "action": "open_result",
+                "target": "google",
+                "query": {"index": 1}
+            }
+
+        if "open second result" in lower_command:
+            return {
+                "status": "success",
+                "action": "open_result",
+                "target": "google",
+                "query": {"index": 2}
+            }
 
         if lower_command.startswith("open "):
-            target = lower_command.replace("open ", "", 1).strip()
-            target = self._normalize_platform(target)
+
+            remaining = lower_command.replace("open ", "", 1).strip()
+
+            # 🔥 CASE 1: platform open
+            normalized = self._normalize_platform(remaining)
+            if normalized in self.valid_platforms:
+                return {
+                    "status": "success",
+                    "action": "open",
+                    "target": normalized
+                }
+
+            # 🔥 CASE 2: open search result (name + index)
+            words = remaining.split()
+
+            index_map = {
+                "first": 1, "1": 1, "one": 1,
+                "second": 2, "2": 2, "two": 2,
+                "third": 3, "3": 3, "three": 3,
+            }
+
+            index = None
+            name_parts = []
+
+            for w in words:
+                if w in index_map:
+                    index = index_map[w]
+                else:
+                    name_parts.append(w)
+
+            name = " ".join(name_parts).strip()
 
             return {
                 "status": "success",
-                "action": "open",
-                "target": target
+                "action": "open_result_by_name",
+                "target": "google",
+                "query": {
+                    "name": name,
+                    "index": index or 1
+                }
             }
+
 
         if lower_command in [
             "read me my messages",
@@ -159,6 +224,24 @@ class SimpleCommandParser:
                     "count": 5,
                     "unread_only": True
                 }
+            }
+        # OPEN SEARCH RESULT
+
+        # SCROLL
+        if "scroll down" in lower_command:
+            return {
+                "status": "success",
+                "action": "scroll",
+                "query": {"direction": "down"}
+            }
+
+
+
+        if "scroll up" in lower_command:
+            return {
+                "status": "success",
+                "action": "scroll",
+                "query": {"direction": "up"}
             }
 
         if lower_command in [
@@ -383,9 +466,7 @@ class SimpleCommandParser:
                 "action": "play_music",
                 "query": remaining
             }
-        # ------------------------------
-        # PAUSE / RESUME / STOP WITH TARGET
-        # ------------------------------
+
         # PAUSE / RESUME / STOP WITH TARGET
         # ------------------------------
         for action_word in ["pause", "resume", "stop"]:
@@ -433,3 +514,4 @@ class SimpleCommandParser:
                 }
 
         return None
+
