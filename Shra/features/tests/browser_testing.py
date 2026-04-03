@@ -1,61 +1,57 @@
-"""
-Browser Automation Testing File
---------------------------------
-This file is ONLY for testing browser automation module.
-
-It directly calls:
-    handle_web_command()
-
-All routing logic lives in:
-    browser_automation/web_handler.py
-"""
-
-from AIVA.Shra.features.browser_automation.web_handler import handle_web_command
+from AIVA.Shra.brain.llm.llm_client import LLMClient
+from AIVA.Shra.brain.llm.prompt_builder import PromptBuilder
+from AIVA.Shra.brain.llm.response_parser import ResponseParser
+from AIVA.Shra.brain.llm.memory import Memory
+from AIVA.Shra.brain.router import Router
+from AIVA.Shra.brain.simple_command_parser import SimpleCommandParser
+from AIVA.Shra.features.browser.controller import BrowserController
 
 
-def show_help():
-    print("\n=== AIVA Browser Automation Test Mode ===\n")
+# Initialize components
+llm = LLMClient()
+prompt_builder = PromptBuilder()
+parser = ResponseParser()
+memory = Memory()
+router = Router()
+browser = BrowserController()
+simple_parser = SimpleCommandParser()
 
-    print("Open App Examples:")
-    print("  open youtube")
-    print("  open spotify")
-    print("  open gmail")
-    print("  open whatsapp")
-    print("  open google\n")
+while True:
 
-    print("Play Examples:")
-    print("  play believer on spotify")
-    print("  play closer on youtube")
-    print("  spotify play shape of you\n")
+    command = input("You: ")
 
-    print("Search Examples:")
-    print("  search artificial intelligence")
-    print("  search ai roadmap\n")
+    if command.lower() in ["exit", "quit"]:
+        break
 
-    print("Mail Example:")
-    print("  send mail to test@gmail.com subject hello body how are you\n")
+    # 🔥 EMAIL FLOW FIRST
+    if browser.pending_email:
+        result = browser.handle({
+            "action": "continue_email",
+            "query": command
+        })
 
-    print("WhatsApp Example:")
-    print("  send whatsapp to Rahul hello bro\n")
+        print("Assistant:", result["response"])
+        continue
 
-    print("Type 'help' to show this message.")
-    print("Type 'exit' to quit.\n")
+    # ---------------- NORMAL FLOW ----------------
+    simple_result = simple_parser.parse(command)
 
+    if simple_result:
+        structured = simple_result
+    else:
+        prompt = prompt_builder.build(command, memory.get_context())
+        raw_response = llm.generate(prompt)
 
-if __name__ == "__main__":
+        print("\n===== RAW LLM OUTPUT =====")
+        print(raw_response)
+        print("==========================\n")
 
-    print("=== Browser Automation Testing Started ===")
-    show_help()
+        parsed = parser.parse(raw_response)
+        structured = router.route(parsed)
 
-    while True:
-        command = input(">>> ")
+    structured["original_command"] = command
 
-        if command.lower().strip() == "exit":
-            print("Exiting Browser Test Mode.")
-            break
+    # 🔥 THIS WAS MISSING / WRONG IN YOUR CODE
+    result = browser.handle(structured)
 
-        if command.lower().strip() == "help":
-            show_help()
-            continue
-
-        handle_web_command(command)
+    print("Assistant:", result["response"])
