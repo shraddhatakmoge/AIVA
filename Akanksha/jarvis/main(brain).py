@@ -1,7 +1,7 @@
 from apps.notepad import *
 from apps.calculator import *
 from apps.vscode import open_vscode, close_vscode
-from apps.word import open_word, close_word
+from apps.word import open_word, close_word, new_document, write_in_word, save_word_file, apply_style, set_alignment, apply_heading
 from apps.powerpoint import open_powerpoint, close_powerpoint
 from apps.spotify import *
 from apps.whatsapp import *
@@ -269,6 +269,19 @@ def execute_action(data, original_command=""):
             open_word()
         elif action == "close":
             close_word()
+        elif action == "new":           
+            new_document()
+        elif action == "write":
+            write_in_word(text)
+        elif action == "save":
+            folder = data.get("folder")
+            save_word_file(text, folder)
+        elif action == "style":
+            apply_style(data.get("style"))
+        elif action == "alignment":
+            set_alignment(data.get("align"))
+        elif action == "heading":
+            apply_heading(data.get("level"))
         return True
 
     # ==============================
