@@ -1,4 +1,4 @@
-from selenium import webdriver
+import undetected_chromedriver as uc
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
@@ -40,6 +40,9 @@ class DriverManager:
     def _start_driver(self):
 
         chrome_options = Options()
+
+        # 🔥 ADD THIS LINE
+        chrome_options.page_load_strategy = "eager"
         chrome_options.add_argument("--start-maximized")
 
         # -------------------------------------------------
@@ -47,6 +50,10 @@ class DriverManager:
         # -------------------------------------------------
         chrome_options.add_argument("--no-first-run")
         chrome_options.add_argument("--no-default-browser-check")
+        chrome_options.add_argument(
+            "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        )
 
         # -------------------------------------------------
         # 🔥 Persistent Chrome Profile (Login stays saved)
@@ -57,18 +64,32 @@ class DriverManager:
 
         # -------------------------------------------------
         # Remove Automation Detection Flags
-        # -------------------------------------------------
-        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        chrome_options.add_experimental_option("useAutomationExtension", False)
-        chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+        chrome_options.add_argument("--remote-allow-origins=*")
+        # 🔥 FIX SPOTIFY LOADING ISSUE
+        chrome_options.add_argument("--autoplay-policy=no-user-gesture-required")
+        chrome_options.add_argument(
+            "--disable-features=PreloadMediaEngagementData,MediaEngagementBypassAutoplayPolicies")
+        chrome_options.add_argument("--use-fake-ui-for-media-stream")
+
+        # 🔥 GPU FIX (CRITICAL)
+        chrome_options.add_argument("--enable-gpu")
+        chrome_options.add_argument("--ignore-gpu-blocklist")
+        chrome_options.add_argument("--enable-webgl")
+        chrome_options.add_argument("--enable-accelerated-video-decode")
+
+        # 🔥 SANDBOX FIX
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
 
         # -------------------------------------------------
         # Start Driver
         # -------------------------------------------------
-        service = Service(ChromeDriverManager().install())
-
         try:
-            self.driver = webdriver.Chrome(service=service, options=chrome_options)
+            self.driver = uc.Chrome(
+                options=chrome_options,
+                version_main=146  # 🔥 MATCH YOUR CHROME VERSION
+            )
+
         except Exception as e:
             print("❌ Failed to start Chrome:", e)
             raise

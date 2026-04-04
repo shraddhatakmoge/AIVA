@@ -7,7 +7,7 @@ import pickle
 import os
 from email.mime.base import MIMEBase
 from email import encoders
-
+from AIVA.Shra.features.browser.window_focus import bring_browser_to_front
 
 class Gmail:
 
@@ -48,6 +48,29 @@ class Gmail:
 
         return build('gmail', 'v1', credentials=creds)
 
+    def open(self, tab_handle=None):
+
+        try:
+            # 🔥 If tab handle provided → switch
+            if tab_handle:
+                self.driver.switch_to.window(tab_handle)
+
+            # 🔥 Always open URL in THIS tab only
+            self.driver.get("https://mail.google.com")
+
+
+            bring_browser_to_front()
+
+            return {
+                "status": "success",
+                "response": "Opened Gmail"
+            }
+
+        except Exception as e:
+            return {
+                "status": "error",
+                "response": str(e)
+            }
     def read_latest_email(self):
         try:
             results = self.service.users().messages().list(

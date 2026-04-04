@@ -12,7 +12,7 @@ from AIVA.Shra.features.browser.platforms.google import Google
 from AIVA.Shra.features.browser.platforms.gmail import Gmail
 from AIVA.Shra.features.browser.platforms.whatsapp import WhatsApp
 from AIVA.Shra.features.browser.window_focus import bring_browser_to_front
-
+from selenium.webdriver.support.ui import WebDriverWait
 
 
 
@@ -26,6 +26,7 @@ class BrowserController:
         self.last_active_platform = None
         self.pending_email = None
         self.previous_tab = None  # 🔥 NEW
+        self.tab_metadata = {}  # 🔥 NEW
 
     # -------------------------------------------------
     # ENSURE DRIVER
@@ -39,12 +40,12 @@ class BrowserController:
             print("⚠ Driver session lost. Restarting...")
 
         self.driver = DriverManager.get_instance().get_driver()
-
         self.platform_instances = {
             "youtube": YouTube(self.driver),
             "spotify": Spotify(self.driver),
             "google": Google(self.driver),
             "whatsapp": WhatsApp(self.driver),
+            "gmail": Gmail(self.driver),  # 🔥 ADD THIS
         }
 
         self.tabs = {}
@@ -53,35 +54,36 @@ class BrowserController:
     # -------------------------------------------------
     # OPEN TAB
     # -------------------------------------------------
+
     def _open_new_tab(self, target):
 
         platform = self.platform_instances[target]
 
-        if not self.tabs:
-            handle = self.driver.current_window_handle
-            self.tabs[target] = handle
-            self.last_active_platform = target
-            return platform.open()
+        # 🔥 Selenium native tab (UI-independent, no hardcoding)
+        self.driver.switch_to.new_window('tab')
 
-        # 🔥 OPEN EMPTY TAB ONLY (NO URL)
-        self.driver.execute_script("window.open('', '_blank');")
+        new_handle = self.driver.current_window_handle
 
-        new_handle = self.driver.window_handles[-1]
-        self.driver.switch_to.window(new_handle)
 
+
+        # Save tab
         self.tabs[target] = new_handle
         self.last_active_platform = target
 
+        self.tab_metadata[new_handle] = {
+            "platform": target,
+            "title": ""
+        }
+
         bring_browser_to_front()
 
-        # 🔥 LET PLATFORM HANDLE URL
-        return platform.open()
-
+        # 🔥 Pass tab handle to platform
+        return platform.open(tab_handle=new_handle)
     # -------------------------------------------------
     # SWITCH TAB
     # -------------------------------------------------
 
-    def find_file_by_name(filename):
+    def find_file_by_name(self,filename):
         search_dirs = [
             os.path.join(os.path.expanduser("~"), "Downloads"),
             os.path.join(os.path.expanduser("~"), "Documents"),
@@ -199,7 +201,7 @@ class BrowserController:
                     result = method(query)
                 else:
                     result = method(**query)
-            elif query is not None:
+            elif query:
                 result = method(query)
             else:
                 result = method()
@@ -210,6 +212,16 @@ class BrowserController:
                     "response": f"'{action}' did not return a response."
                 }
 
+            # 🔥 SAVE TAB TITLE (ADD THIS BEFORE RETURN)
+            try:
+                title = self.driver.title.lower()
+                handle = self.driver.current_window_handle
+
+                if handle in self.tab_metadata:
+                    self.tab_metadata[handle]["title"] = title
+            except:
+                pass
+
             return result
 
         except Exception as e:
@@ -218,6 +230,34 @@ class BrowserController:
                 "response": str(e)
             }
 
+    def switch_to_tab_by_name(self, name):
+
+        name = name.lower()
+
+        for handle, meta in self.tab_metadata.items():
+
+            # 🔥 MATCH PLATFORM (spotify, youtube etc.)
+            if meta.get("platform") == name:
+                self.driver.switch_to.window(handle)
+                bring_browser_to_front()
+                return {
+                    "status": "success",
+                    "response": f"Switched to {name}"
+                }
+
+            # 🔥 MATCH WEBSITE TITLE (azure, apple etc.)
+            if name in meta.get("title", ""):
+                self.driver.switch_to.window(handle)
+                bring_browser_to_front()
+                return {
+                    "status": "success",
+                    "response": f"Switched to {name} website"
+                }
+
+        return {
+            "status": "error",
+            "response": f"No tab found for {name}"
+        }
     # -------------------------------------------------
     # EMAIL PREVIEW HELPER
     # -------------------------------------------------
@@ -243,6 +283,47 @@ You can say:
     # HANDLE COMMAND
     # -------------------------------------------------
     def handle(self, structured):
+
+        # 🔥 HANDLE EMAIL CONTINUATION (CRITICAL FIX)
+        if structured.get("action") == "continue_email" and self.pending_email:
+
+            user_input = structured.get("query", "").strip()
+            user_lower = user_input.lower()
+
+            step = self.pending_email.get("step")
+
+            # EMAIL ADDRESS STEP
+            if step == "email":
+
+                # 🔥 HANDLE DICT CASE ({"to": "shra"})
+                if isinstance(structured.get("query"), dict):
+                    user_input = structured["query"].get("to", "")
+
+                # 🔥 HANDLE STRING CASE ("send mail to shra")
+                user_input = str(user_input).lower().strip()
+
+                if "send mail to" in user_input:
+                    user_input = user_input.replace("send mail to", "").strip()
+
+                # 🔥 APPLY CONTACT MAPPING
+                from contacts import CONTACTS
+
+                if user_input in CONTACTS:
+                    user_input = CONTACTS[user_input]
+
+                self.pending_email["to"] = user_input
+                self.pending_email["step"] = "subject"
+
+                return {
+                    "status": "ask",
+                    "response": "What should be the subject?"
+                }
+                self.pending_email["step"] = "subject"
+
+                return {
+                    "status": "ask",
+                    "response": "What should be the subject?"
+                }
 
         # 🔥 MULTI-STEP EMAIL FLOW
         if self.pending_email:
@@ -336,7 +417,7 @@ You can say:
                         "response": f'Got it 👍 I\'ve attached "{filename}"\n\n{self._build_email_preview()}'
                     }
 
-                matches = find_file_by_name(clean_input)
+                matches = self.find_file_by_name(clean_input)
 
                 if not matches:
                     return {
@@ -616,6 +697,10 @@ You can say:
 
         action = structured.get("action")
         query = structured.get("query")
+        # 🔥 NEW SWITCH HANDLER
+        if action == "switch_to_app":
+            target_name = structured.get("query")
+            return self.switch_to_tab_by_name(target_name)
 
         # 🔥 HANDLE NON-PLATFORM ACTIONS FIRST
 
@@ -721,14 +806,7 @@ You can say:
             }
 
         # GMAIL OPEN
-        if action == "open" and structured.get("target") in ["gmail", "mail"]:
-            import webbrowser
-            webbrowser.open("https://mail.google.com")
 
-            return {
-                "status": "success",
-                "response": "Opened Gmail"
-            }
 
         # NORMAL FLOW
         self._ensure_driver()
@@ -743,14 +821,7 @@ You can say:
         platform = self.platform_instances[target]
 
         # OPEN
-        if action == "open":
-            if target in self.tabs and self._switch_to_tab(target):
-                return {
-                    "status": "success",
-                    "response": f"{target.capitalize()} already open"
-                }
 
-            return self._open_new_tab(target)
 
         # CLOSE TAB
         if action == "close":
@@ -778,11 +849,26 @@ You can say:
                         "status": "error",
                         "response": f"Could not close tab: {str(e)}"
                     }
+        # OPEN (🔥 FINAL FIX)
+        # OPEN (🔥 PROFESSIONAL TAB MANAGEMENT)
+        if action == "open":
+
+            # 🔥 IF TAB ALREADY EXISTS → SWITCH
+            if target in self.tabs:
+                switched = self._switch_to_tab(target)
+
+                if switched:
+                    return {
+                        "status": "success",
+                        "response": f"Switched to {target.capitalize()}"
+                    }
+
+            # 🔥 ELSE → OPEN NEW TAB
+            return self._open_new_tab(target)
 
         # AUTO OPEN
         just_opened = False
-
-        if target not in self.tabs:
+        if action != "open" and target not in self.tabs:
             open_result = self._open_new_tab(target)
             just_opened = True
 

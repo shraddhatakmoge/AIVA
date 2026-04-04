@@ -26,14 +26,6 @@ class YouTube:
     def _safe_get(self, url):
         try:
             time.sleep(1.5)
-            # 🔥 FORCE SAFE TAB LOAD
-            current_handles = self.driver.window_handles
-            current_tab = self.driver.current_window_handle
-
-            # ensure we are in correct tab
-            if current_tab != current_handles[-1]:
-                self.driver.switch_to.window(current_handles[-1])
-
             self.driver.get(url)
         except:
             print("⚠️ Page load timeout, stopping...")
@@ -185,10 +177,17 @@ class YouTube:
                 EC.presence_of_all_elements_located((By.XPATH, '//a[@id="video-title"]'))
             )
 
-            videos = self.driver.find_elements(By.XPATH, '//a[@id="video-title"]')
+            # 🔥 ALWAYS REFRESH ELEMENTS (FIX STALE ISSUE)
+            videos = WebDriverWait(self.driver, 10).until(
+                EC.presence_of_all_elements_located((By.XPATH, '//a[@id="video-title"]'))
+            )
 
             selected_video = None
             query_lower = query.lower()
+            query_words = query_lower.split()
+
+            best_match = None
+            best_score = 0
 
             for video in videos:
                 title = video.get_attribute("title")
@@ -198,26 +197,72 @@ class YouTube:
 
                 title_lower = title.lower()
 
-                if (
-                        query_lower in title_lower and
-                        "ad" not in title_lower and
-                        "news" not in title_lower and
-                        "live" not in title_lower
-                ):
-                    selected_video = video
-                    break
+                # skip unwanted
+                if any(x in title_lower for x in ["ad", "news", "live"]):
+                    continue
 
+                # 🔥 SCORE MATCHING
+                score = sum(1 for word in query_words if word in title_lower)
+
+                if score > best_score:
+                    best_score = score
+                    best_match = video
+
+            # final selection
+            # 🔥 ONLY ACCEPT IF MATCH IS GOOD
+            if best_score >= max(1, len(query_words) // 2):
+                selected_video = best_match
+            else:
+                selected_video = None
             if not selected_video and videos:
                 selected_video = videos[0]
 
             if selected_video:
-                self.driver.execute_script("arguments[0].click();", selected_video)
+                self.driver.execute_script(
+                    "arguments[0].scrollIntoView({block: 'center'});",
+                    selected_video
+                )
+                time.sleep(1)
+
+                try:
+                    self.driver.execute_script(
+                        "arguments[0].scrollIntoView({block: 'center'});",
+                        selected_video
+                    )
+                    time.sleep(1)
+
+                    self.driver.execute_script("arguments[0].click();", selected_video)
+
+                except:
+                    # 🔥 RE-FETCH ELEMENT AND RETRY
+                    fresh_videos = self.driver.find_elements(By.XPATH, '//a[@id="video-title"]')
+
+                    if fresh_videos:
+                        self.driver.execute_script(
+                            "arguments[0].scrollIntoView({block: 'center'});",
+                            fresh_videos[0]
+                        )
+                        time.sleep(1)
+
+                        self.driver.execute_script("arguments[0].click();", fresh_videos[0])
                 time.sleep(3)
+
             else:
-                return {
-                    "status": "error",
-                    "response": "No suitable video found."
-                }
+                # 🔥 fallback: click FIRST RESULT AFTER FRESH SEARCH
+                if videos:
+                    self.driver.execute_script(
+                        "arguments[0].scrollIntoView({block: 'center'});",
+                        videos[0]
+                    )
+                    time.sleep(1)
+
+                    self.driver.execute_script("arguments[0].click();", videos[0])
+                    time.sleep(3)
+                else:
+                    return {
+                        "status": "error",
+                        "response": "No videos found."
+                    }
 
         except TimeoutException:
             return {

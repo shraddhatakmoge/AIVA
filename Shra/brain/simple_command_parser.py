@@ -104,6 +104,15 @@ class SimpleCommandParser:
                 "action": "switch_to_google",
                 "target": "google"
             }
+        # 🔥 NEW: switch to app / website
+        if "switch to" in lower_command:
+            name = lower_command.replace("switch to", "").strip()
+
+            return {
+                "status": "success",
+                "action": "switch_to_app",
+                "query": name
+            }
 
 
         if " and " in lower_command:
@@ -131,6 +140,11 @@ class SimpleCommandParser:
             return {
                 "status": "success",
                 "action": "add_to_favorites"
+            }
+        if "remove this" in lower_command and "favorite" in lower_command:
+            return {
+                "status": "success",
+                "action": "remove_favorite"
             }
 
         if "play my favorite" in lower_command:
