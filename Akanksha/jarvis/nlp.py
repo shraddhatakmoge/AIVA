@@ -2,7 +2,8 @@ import re
 import os
 
 
-def process_nlp(command):
+# 🔥 Notice we added 'current_app' to the function arguments
+def process_nlp(command, current_app="notepad"):
     raw_text_command = command.strip() 
     cmd = command.lower().strip()
 
@@ -31,7 +32,6 @@ def process_nlp(command):
     # =========================================
     # 🧠 STEP 1: EXPLICIT APP DETECTION
     # =========================================
-    # We figure out which app they are talking about FIRST.
     
     if "word" in cmd or "ms word" in cmd:
         result["app"] = "word"
@@ -45,6 +45,10 @@ def process_nlp(command):
         result["app"] = "file_system"
     elif "notepad" in cmd:
          result["app"] = "notepad"
+    else:
+        # 🔥 THE MAGIC TRICK: If they didn't specify an app, use the Memory!
+        result["app"] = current_app
+
 
     # -----------------------------------------
     # 📄 MS WORD LOGIC
@@ -160,6 +164,42 @@ def process_nlp(command):
             result["action"] = "alignment"; result["align"] = "left"
         elif "justify" in cmd:
             result["action"] = "alignment"; result["align"] = "justify"
+            
+            
+        # --- ADVANCED FEATURES (Ported from Notepad) ---
+        elif "clear" in cmd or "empty" in cmd: result["action"] = "clear"
+        elif "read" in cmd: result["action"] = "read"
+        elif "new paragraph" in cmd: result["action"] = "new_paragraph"
+        elif "new line" in cmd: result["action"] = "new_line"
+        elif cmd == "space" or "add space" in cmd: result["action"] = "space"
+
+        elif "delete word" in cmd:
+            result["action"] = "delete"
+            result["text"] = cmd.split("delete word")[-1].strip()
+
+        elif "insert" in cmd or "add" in cmd or "put" in cmd:
+            match_ins_line = re.search(r"(?:insert|add|put) (.*?) (?:at|on|in) line (\d+)", cmd)
+            if match_ins_line:
+                result["action"] = "insert"
+                result["text"] = match_ins_line.group(1).strip()
+                result["line"] = int(match_ins_line.group(2))
+            else:
+                text = cmd.replace("insert", "").replace("add", "").strip()
+                result["action"] = "insert"
+                result["text"] = text
+
+        elif "replace" in cmd or "change" in cmd:
+            match_replace = re.search(r"(?:replace|change) (.*?) (?:with|to) (.*)", cmd)
+            if match_replace:
+                result["action"] = "replace"
+                result["old_text"] = match_replace.group(1).strip()
+                result["new_text"] = match_replace.group(2).strip()
+
+        elif "move" in cmd:
+            for direction in ["left", "right", "up", "down"]:
+                if direction in cmd:
+                    result["action"] = "move"
+                    result["direction"] = direction
 
         return result
 
@@ -239,16 +279,18 @@ def process_nlp(command):
     # 📝 UPDATED NOTEPAD LOGIC
     # =========================================
     # For WRITE/TYPE, use raw_text_command to preserve capitals
-    # 🔥 FIX: Ignore this if the user says "word" so MS Word can handle it
-    if ("write" in cmd or "type" in cmd) and "word" not in cmd:
+    if ("write" in cmd or "type" in cmd):
         # Remove the word 'write' or 'type' but keep the rest of the casing
-        text_to_write = re.sub(r'^(write|type)\s+', '', raw_text_command, flags=re.IGNORECASE)
-        return {"app": "notepad", "action": "write", "text": text_to_write}
+        text_to_write = re.sub(r'^(write|type|add)\s+', '', raw_text_command, flags=re.IGNORECASE).strip()
+        
+        # 🔥 THE FIX: Use result["app"] so it respects your Context Memory!
+        return {"app": result["app"], "action": "write", "text": text_to_write}
 
     # For SAVE, use raw_text_command (In case they want a Capitalized filename)
     match_save = re.search(r"save (?:as|file|file called|it as) (.*)", raw_text_command, re.IGNORECASE)
     if match_save:
-        return {"app": "notepad", "action": "save", "text": match_save.group(1).strip()}
+        # 🔥 THE FIX: Use result["app"] here too!
+        return {"app": result["app"], "action": "save", "text": match_save.group(1).strip()}
 
 
     result = {

@@ -4,6 +4,14 @@ import pyautogui
 import pygetwindow as gw
 from common import open_app_by_name, close_app
 import win32com.client
+import pyperclip
+
+import pyttsx3
+engine = pyttsx3.init()
+
+def speak(text):
+    engine.say(text)
+    engine.runAndWait()
 
 
 
@@ -27,6 +35,12 @@ def focus_word():
 
 # -------- 1 & 2. OPEN / CLOSE --------
 def open_word():
+    # 1. 🔥 THE BOUNCER: Check if Word is already open first!
+    if focus_word():
+        print("✅ JARVIS: Word is already open. Brought to front!")
+        return # <-- This 'return' completely stops the code from opening a duplicate!
+        
+    # 2. If it is NOT open, launch it
     print("🚀 JARVIS: Opening Microsoft Word...")
     try:
         # This mirrors the 'Win + R -> winword' behavior perfectly
@@ -143,13 +157,46 @@ def set_alignment(align):
 
 # -------- 9. HEADINGS --------
 def apply_heading(level):
-    if focus_word():
-        # Word's native shortcut for styles is Ctrl + Alt + (1, 2, or 3)
-        if 1 <= level <= 3:
-            pyautogui.hotkey('ctrl', 'alt', str(level))
-            print(f"✅ Applied Heading {level}")
-    else:
-        print("❌ Word is not open!")
+    print(f"🏷️ JARVIS: Preparing to apply Heading {level}...")
+    
+    try:
+        # 1. ATTEMPT TO CONNECT OR LAUNCH WORD
+        try:
+            word_app = win32com.client.GetActiveObject("Word.Application")
+        except:
+            print("📂 Word isn't open. Launching it via Engine...")
+            word_app = win32com.client.Dispatch("Word.Application") 
+            word_app.Visible = True
+            word_app.Documents.Add() 
+            time.sleep(2) 
+
+        # 2. 🔥 FORCE TO FRONT SO YOU CAN SEE IT
+        word_app.Activate()  
+        focus_word()         
+        
+        # Give your eyes a second to adjust
+        time.sleep(1.5)      
+
+        # 3. APPLY HEADING VIA ENGINE
+        selection = word_app.Selection
+        
+        # Word's internal API constants for styles:
+        # -2 = Heading 1, -3 = Heading 2, -4 = Heading 3, etc.
+        heading_constants = {1: -2, 2: -3, 3: -4, 4: -5, 5: -6}
+        
+        if level in heading_constants:
+            selection.Style = heading_constants[level]
+            print(f"✅ JARVIS: Applied Heading {level}.")
+        else:
+            print(f"❌ JARVIS: I can only do Headings 1 through 6.")
+            
+    except Exception as e:
+        print(f"⚠️ API Failed, trying manual shortcut... Error: {e}")
+        # Manual Fallback just in case
+        if focus_word():
+            if 1 <= level <= 3:
+                pyautogui.hotkey('ctrl', 'alt', str(level))
+                print(f"✅ JARVIS: Applied Heading {level} via keyboard.")
         
 # -------- 10. OPEN EXISTING FILE --------
 def open_existing_word_file(file_path):
@@ -238,3 +285,95 @@ def style_specific_text(target_text, style_type=None, color_name=None, font_size
 
     except Exception as e:
         print(f"❌ Error in Master Style Function: {e}")
+        
+# ==========================================
+# 🧠 ADVANCED WORD FEATURES (From Notepad)
+# ==========================================
+
+# -------- READ ALOUD --------
+def read_word():
+    print("🔊 JARVIS: Reading Word document...")
+    try:
+        word_app = win32com.client.GetActiveObject("Word.Application")
+        text = word_app.ActiveDocument.Content.Text
+        
+        # Clean up hidden Word characters before reading
+        clean_text = text.replace('\r', '\n').strip()
+        
+        if not clean_text:
+            print("❌ JARVIS: There is no text.")
+            speak("There is no text.")
+            return
+
+        print("\n--- Word Content ---\n", clean_text)
+        speak(clean_text)
+    except Exception as e:
+        print(f"❌ Word is not open or accessible: {e}")
+
+# -------- REPLACE WORD --------
+def word_replace_word(old_word, new_word):
+    print(f"🔄 JARVIS: Replacing '{old_word}' with '{new_word}' in Word...")
+    try:
+        word_app = win32com.client.GetActiveObject("Word.Application")
+        find_obj = word_app.ActiveDocument.Content.Find
+        
+        # Word API Replace Magic (2 = Replace All)
+        find_obj.Execute(old_word, False, False, False, False, False, True, 1, False, new_word, 2)
+        print(f"✅ JARVIS: Replaced '{old_word}' with '{new_word}'.")
+    except Exception as e:
+        print(f"❌ Error: {e}")
+
+# -------- DELETE WORD --------
+def word_delete_word(word_to_delete):
+    # Deleting is just replacing with nothing!
+    word_replace_word(word_to_delete, "")
+
+# -------- CLEAR DOCUMENT --------
+def word_clear():
+    print("🗑️ JARVIS: Clearing Word document...")
+    try:
+        word_app = win32com.client.GetActiveObject("Word.Application")
+        word_app.ActiveDocument.Content.Delete()
+        print("✅ JARVIS: Word document cleared.")
+    except Exception as e:
+        print(f"❌ Error: {e}")
+
+# -------- LINE / PARAGRAPH INSERTION --------
+def word_insert_text_at_line(text, line_number):
+    try:
+        word_app = win32com.client.GetActiveObject("Word.Application")
+        doc = word_app.ActiveDocument
+        paragraphs = doc.Paragraphs
+        
+        if 0 < line_number <= paragraphs.Count:
+            rng = paragraphs(line_number).Range
+            rng.InsertBefore(text + " ")
+            print(f"✅ JARVIS: Inserted text at paragraph {line_number}.")
+        elif line_number == paragraphs.Count + 1:
+            doc.Content.InsertAfter("\n" + text)
+            print(f"✅ JARVIS: Appended text to new paragraph {line_number}.")
+        else:
+            print(f"❌ JARVIS: The document only has {paragraphs.Count} paragraphs.")
+    except Exception as e:
+         print(f"❌ Error: {e}")
+
+# -------- CURSOR MOVEMENTS & SPACING --------
+def word_space():
+    if focus_word(): pyautogui.press('space')
+
+def word_new_line():
+    if focus_word(): pyautogui.press('enter')
+
+def word_new_paragraph():
+    if focus_word():
+        pyautogui.press('enter')
+        pyautogui.press('enter')
+
+def word_move_cursor(direction):
+    if focus_word(): pyautogui.press(direction)
+
+def word_insert_at_cursor(text):
+    if focus_word():
+        pyperclip.copy(text)
+        time.sleep(0.1)
+        pyautogui.hotkey('ctrl', 'v')

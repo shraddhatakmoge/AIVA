@@ -27,11 +27,12 @@ def get_active_app():
         win = gw.getActiveWindow()
         if win and win.title:
             title = win.title.lower()
-            # Checks if "notepad" exists anywhere in the title
             if "notepad" in title:
                 return "notepad"
             elif "whatsapp" in title:
                 return "whatsapp"
+            elif "word" in title:  # 🔥 NEW: Teach it to see Word!
+                return "word"
     except Exception as e:
         print(f"⚠️ Window detection error: {e}")
     return None
@@ -303,6 +304,41 @@ def execute_action(data, original_command=""):
             
             # Now passing all 4 pieces of data!
             style_specific_text(target, style, color, size)
+            
+        # --- ADVANCED NOTEPAD FEATURES PORTED TO WORD ---
+        elif action == "read":
+            read_word()
+    
+        elif action == "replace":
+            old_word = data.get("old_text")
+            new_word = data.get("new_text")
+            if old_word and new_word:
+                word_replace_word(old_word, new_word)
+                
+        elif action == "delete":
+            word_delete_word(data.get("text"))
+            
+        elif action == "clear":
+            word_clear()
+            
+        elif action == "insert":
+            if line:
+                word_insert_text_at_line(text, line)
+            else:
+                word_insert_at_cursor(text)
+                
+        elif action == "space":
+            word_space()
+            
+        elif action == "new_line":
+            word_new_line()
+            
+        elif action == "new_paragraph":
+            word_new_paragraph()
+            
+        elif action == "move":
+            word_move_cursor(direction)
+            
         return True
 
     # ==============================
@@ -405,7 +441,12 @@ def is_nlp_confident(data):
 # ==============================
 import re
 
+# 🔥 JARVIS'S MEMORY STATE
+CURRENT_APP_STATE = "notepad" 
+
 def process_command(command):
+    global CURRENT_APP_STATE
+    
     # Standardize input
     command = command.lower().strip()
 
@@ -417,18 +458,24 @@ def process_command(command):
         if not part: continue
         
         print(f"🤖 JARVIS processing: {part}")
-        nlp_data = process_nlp(part) 
         
-        # Contextual Check
-        if nlp_data.get("app") is None:
-            active = get_active_app()
-            if active == "notepad":
-                nlp_data["app"] = "notepad"
+        # 1. 👁️ LOOK AT THE SCREEN: Is the user physically looking at Word or Notepad?
+        on_screen = get_active_app()
+        if on_screen:
+            CURRENT_APP_STATE = on_screen
+            
+        # 2. 🧠 PASS THE MEMORY TO NLP
+        # This tells the brain: "Hey, we are currently focused on [Word]!"
+        nlp_data = process_nlp(part, CURRENT_APP_STATE) 
+        
+        # 3. 💾 UPDATE MEMORY IF APP CHANGED
+        # If the user explicitly said "open notepad", update the memory!
+        if nlp_data.get("app"):
+            CURRENT_APP_STATE = nlp_data["app"]
 
         # Validate and Execute
         if is_nlp_confident(nlp_data):
             execute_action(nlp_data, part)
-            # 🔥 INCREASE DELAY to 0.5 to stop the 'smushing'
             time.sleep(0.5)
             
 # ==============================
