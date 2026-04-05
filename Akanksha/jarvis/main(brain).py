@@ -113,6 +113,7 @@ def execute_action(data, original_command=""):
             if line:
                 delete_word_from_line(text, line)
             else:
+                # 🔥 Make sure this matches the function name in notepad.py
                 delete_word(text)
 
         elif action == "read":

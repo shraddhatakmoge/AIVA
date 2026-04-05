@@ -292,32 +292,39 @@ def style_specific_text(target_text, style_type=None, color_name=None, font_size
 
 # -------- READ ALOUD --------
 def read_word():
+    # 🔥 FORCE TO FRONT
+    if not focus_word():
+        print("❌ Word is not open.")
+        return
+
     print("🔊 JARVIS: Reading Word document...")
     try:
         word_app = win32com.client.GetActiveObject("Word.Application")
-        text = word_app.ActiveDocument.Content.Text
+        # 🔥 SECOND FORCE (API level)
+        word_app.Activate() 
         
-        # Clean up hidden Word characters before reading
+        text = word_app.ActiveDocument.Content.Text
         clean_text = text.replace('\r', '\n').strip()
         
         if not clean_text:
-            print("❌ JARVIS: There is no text.")
             speak("There is no text.")
             return
 
-        print("\n--- Word Content ---\n", clean_text)
         speak(clean_text)
     except Exception as e:
-        print(f"❌ Word is not open or accessible: {e}")
+        print(f"❌ Error: {e}")
 
 # -------- REPLACE WORD --------
 def word_replace_word(old_word, new_word):
+    # 🔥 FORCE TO FRONT
+    focus_word() 
+
     print(f"🔄 JARVIS: Replacing '{old_word}' with '{new_word}' in Word...")
     try:
         word_app = win32com.client.GetActiveObject("Word.Application")
-        find_obj = word_app.ActiveDocument.Content.Find
+        word_app.Activate() # 🔥 Bring to front via API
         
-        # Word API Replace Magic (2 = Replace All)
+        find_obj = word_app.ActiveDocument.Content.Find
         find_obj.Execute(old_word, False, False, False, False, False, True, 1, False, new_word, 2)
         print(f"✅ JARVIS: Replaced '{old_word}' with '{new_word}'.")
     except Exception as e:
@@ -325,23 +332,32 @@ def word_replace_word(old_word, new_word):
 
 # -------- DELETE WORD --------
 def word_delete_word(word_to_delete):
+    focus_word() 
     # Deleting is just replacing with nothing!
     word_replace_word(word_to_delete, "")
 
 # -------- CLEAR DOCUMENT --------
 def word_clear():
+    # 🔥 FORCE TO FRONT
+    focus_word() 
+
     print("🗑️ JARVIS: Clearing Word document...")
     try:
         word_app = win32com.client.GetActiveObject("Word.Application")
+        word_app.Activate()
         word_app.ActiveDocument.Content.Delete()
         print("✅ JARVIS: Word document cleared.")
     except Exception as e:
         print(f"❌ Error: {e}")
-
+        
 # -------- LINE / PARAGRAPH INSERTION --------
 def word_insert_text_at_line(text, line_number):
+    # 🔥 FORCE TO FRONT
+    focus_word() 
+
     try:
         word_app = win32com.client.GetActiveObject("Word.Application")
+        word_app.Activate()
         doc = word_app.ActiveDocument
         paragraphs = doc.Paragraphs
         
@@ -351,9 +367,7 @@ def word_insert_text_at_line(text, line_number):
             print(f"✅ JARVIS: Inserted text at paragraph {line_number}.")
         elif line_number == paragraphs.Count + 1:
             doc.Content.InsertAfter("\n" + text)
-            print(f"✅ JARVIS: Appended text to new paragraph {line_number}.")
-        else:
-            print(f"❌ JARVIS: The document only has {paragraphs.Count} paragraphs.")
+            print(f"✅ JARVIS: Appended text.")
     except Exception as e:
          print(f"❌ Error: {e}")
 
