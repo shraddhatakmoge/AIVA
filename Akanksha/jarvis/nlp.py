@@ -473,7 +473,7 @@ def process_nlp(command):
     if match_put:
         return {"app": "notepad", "action": "insert", "text": match_put.group(1).strip(), "line": int(match_put.group(2))}
 
-# =========================================
+    # =========================================
     # 📂 FILE & FOLDER OPERATIONS (NEW)
     # =========================================
     
@@ -514,6 +514,88 @@ def process_nlp(command):
             "intent": intent,
             "entities": {"path": name}
         }
+    # =========================================
+    # 📄 MS WORD 
+    # =========================================
+    if "word" in cmd:
+        result = {"app": "word", "action": None}
+        
+        # 1 & 2. Open / Close
+        if "open" in cmd:
+            result["action"] = "open"
+        elif "close" in cmd:
+            result["action"] = "close"
+            
+        # 3. New Document
+        elif "new document" in cmd or "new file" in cmd:
+            result["action"] = "new"
+            
+        # 4. Write
+        elif "write" in cmd or "type" in cmd:
+            result["action"] = "write"
+            # Remove the trigger word but keep exact casing
+            text = re.sub(r'^(write|type)\s+', '', raw_text_command, flags=re.IGNORECASE).strip()
+            # Clean up mentions of the app
+            text = re.sub(r'\s+in word$', '', text, flags=re.IGNORECASE)
+            result["text"] = text
+            
+        # 5 & 6. Save & Folder specific
+        elif "save" in cmd:
+            result["action"] = "save"
+            
+            # Smart location detection
+            if "desktop" in cmd:
+                result["folder"] = os.path.expanduser("~\\Desktop")
+            elif "documents" in cmd:
+                result["folder"] = os.path.expanduser("~\\Documents")
+            
+            # Extract filename (e.g., "save as report on desktop")
+            match = re.search(r"save (?:it |file )?(?:as|called|with name)? (.*?)(?: in| to| on|$)", cmd)
+            if match:
+                filename = match.group(1).strip()
+                if not filename.endswith(".docx"):
+                    filename += ".docx"
+                result["text"] = filename
+            else:
+                result["text"] = "Document.docx"
+                
+        # 9. Headings
+        elif "heading" in cmd:
+            result["action"] = "heading"
+            match = re.search(r"heading (\d)", cmd)
+            result["level"] = int(match.group(1)) if match else 1
+            
+        # 7. Styling
+        elif "bold" in cmd:
+            result["action"] = "style"
+            result["style"] = "bold"
+        elif "italic" in cmd:
+            result["action"] = "style"
+            result["style"] = "italic"
+        elif "underline" in cmd:
+            result["action"] = "style"
+            result["style"] = "underline"
+            
+        # 8. Alignment
+        elif "align center" in cmd or "center align" in cmd:
+            result["action"] = "alignment"
+            result["align"] = "center"
+        elif "align right" in cmd or "right align" in cmd:
+            result["action"] = "alignment"
+            result["align"] = "right"
+        elif "align left" in cmd or "left align" in cmd:
+            result["action"] = "alignment"
+            result["align"] = "left"
+        elif "justify" in cmd:
+            result["action"] = "alignment"
+            result["align"] = "justify"
+            
+        if result["action"]:
+            return result
+
+
+
+
 
     # DEFAULT APP FALLBACK
     if result["app"] is None:
