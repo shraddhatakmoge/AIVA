@@ -1,7 +1,7 @@
 from apps.notepad import *
 from apps.calculator import *
 from apps.vscode import open_vscode, close_vscode
-from apps.word import open_word, close_word, new_document, write_in_word, save_word_file, apply_style, set_alignment, apply_heading
+from apps.word import *
 from apps.powerpoint import open_powerpoint, close_powerpoint
 from apps.spotify import *
 from apps.whatsapp import *
@@ -267,6 +267,19 @@ def execute_action(data, original_command=""):
     elif app == "word":
         if action == "open":
             open_word()
+        elif action == "open_file":
+            file_name = data.get("text")
+            location = data.get("folder")
+            
+            print(f"🔍 JARVIS: Searching for '{file_name}'...")
+            # Use your smart search tool from common.py!
+            real_file_path = find_document(file_name, specific_location=location)
+            
+            if real_file_path:
+                open_existing_word_file(real_file_path)
+            else:
+                print(f"❌ JARVIS: Could not find a file named '{file_name}'.")
+
         elif action == "close":
             close_word()
         elif action == "new":           
@@ -282,6 +295,14 @@ def execute_action(data, original_command=""):
             set_alignment(data.get("align"))
         elif action == "heading":
             apply_heading(data.get("level"))
+        elif action == "style_specific":
+            target = data.get("text")
+            style = data.get("style")
+            color = data.get("color")
+            size = data.get("size")
+            
+            # Now passing all 4 pieces of data!
+            style_specific_text(target, style, color, size)
         return True
 
     # ==============================
