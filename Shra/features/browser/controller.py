@@ -2,7 +2,7 @@ import inspect
 import os
 import glob
 from difflib import get_close_matches
-
+import random
 from selenium.common.exceptions import WebDriverException
 
 from AIVA.Shra.features.browser.driver import DriverManager
@@ -697,6 +697,48 @@ You can say:
 
         action = structured.get("action")
         query = structured.get("query")
+        # -------------------------------------------------
+        # 🔥 MOOD HANDLER (NEW FEATURE)
+        # -------------------------------------------------
+        if action == "handle_mood":
+
+            mood = query.get("mood")
+
+            if mood == "sad":
+
+                sad_playlists = [
+                    "lofi calm music",
+                    "healing instrumental music",
+                    "sad chill songs",
+                    "peaceful piano music",
+                    "relaxing ambient music"
+                ]
+
+                return self.handle({
+                    "action": "play_music",
+                    "target": "youtube",
+                    "query": random.choice(sad_playlists)
+                })
+            elif mood == "happy":
+                return self.handle({
+                    "action": "play_music",
+                    "target": "youtube",
+                    "query": "happy upbeat songs"
+                })
+
+            elif mood == "stressed":
+                return self.handle({
+                    "action": "play_music",
+                    "target": "youtube",
+                    "query": "relaxing meditation music"
+                })
+
+            elif mood == "bored":
+                return self.handle({
+                    "action": "search",
+                    "target": "youtube",
+                    "query": "fun interesting videos"
+                })
         # 🔥 NEW SWITCH HANDLER
         if action == "switch_to_app":
             target_name = structured.get("query")
@@ -720,9 +762,23 @@ You can say:
             }
         # ✅ READ EMAIL HANDLER
         if action == "read_latest_email":
-            gmail = Gmail(None)
-            return gmail.read_latest_email()
 
+            # 🔥 ENSURE DRIVER FIRST
+            self._ensure_driver()
+
+            gmail = self.platform_instances.get("gmail")
+
+            if not gmail:
+                return {
+                    "status": "error",
+                    "response": "Gmail not initialized."
+                }
+
+            count = 1
+            if isinstance(query, dict):
+                count = query.get("count", 1)
+
+            return gmail.read_latest_emails(count)
         if not action:
             return {
                 "status": "error",
@@ -902,7 +958,10 @@ You can say:
         else:
             result = self._execute_platform_method(platform, action, query)
 
-        if result.get("status") == "success":
+        # 🔥 HANDLE SUCCESS + INFO (DO NOT FALLBACK)
+        if result.get("status") in ["success", "info"]:
             self.last_active_platform = target
+            return result
 
+        # 🔥 ONLY fallback on real error
         return result

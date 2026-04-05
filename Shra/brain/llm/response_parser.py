@@ -18,8 +18,8 @@ class ResponseParser:
             # 🔥 NORMALIZATION LAYER (IMPORTANT)
             structured = {
                 "action": data.get("action"),
-                "target": data.get("app"),     # map app → target
-                "query": data.get("text")      # map text → query
+                "target": data.get("target"),
+                "query": data.get("query")
             }
 
             return structured

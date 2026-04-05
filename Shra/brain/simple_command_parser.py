@@ -148,12 +148,35 @@ class SimpleCommandParser:
             }
 
         if "play my favorite" in lower_command:
+
+            # 🔥 CHECK FOR PLATFORM (IMPORTANT FIX)
+            if " on " in lower_command:
+                _, target = lower_command.split(" on ", 1)
+                target = self._normalize_platform(target.strip())
+
+                return {
+                    "status": "success",
+                    "action": "play_favorite",
+                    "target": target
+                }
+
             return {
                 "status": "success",
                 "action": "play_favorite"
             }
 
         if "play last song" in lower_command:
+
+            if " on " in lower_command:
+                _, target = lower_command.split(" on ", 1)
+                target = self._normalize_platform(target.strip())
+
+                return {
+                    "status": "success",
+                    "action": "play_last",
+                    "target": target
+                }
+
             return {
                 "status": "success",
                 "action": "play_last"
@@ -179,6 +202,23 @@ class SimpleCommandParser:
                 "target": "google",
                 "query": {"index": 2}
             }
+        # -------------------------------------------------
+        # 🔥 MOOD DETECTION (NEW FEATURE)
+        # -------------------------------------------------
+        mood_keywords = {
+            "sad": ["sad", "lonely", "low", "depressed", "bad day"],
+            "happy": ["happy", "excited", "good mood"],
+            "stressed": ["stressed", "tired", "overwhelmed", "anxious"],
+            "bored": ["bored", "nothing to do"]
+        }
+
+        for mood, words in mood_keywords.items():
+            if any(word in lower_command for word in words):
+                return {
+                    "status": "success",
+                    "action": "handle_mood",
+                    "query": {"mood": mood}
+                }
 
         if lower_command.startswith("open "):
 
@@ -378,11 +418,23 @@ class SimpleCommandParser:
                 }
         # =====================================================
 
+        # 🔥 dynamic email count
+        match = re.match(r"read (?:my )?(\d+) emails?", lower_command)
+        if match:
+            count = int(match.group(1))
+            return {
+                "status": "success",
+                "action": "read_latest_email",
+                "target": "gmail",
+                "query": {"count": count}
+            }
+
         if lower_command in ["read my email", "read latest email", "read gmail"]:
             return {
                 "status": "success",
                 "action": "read_latest_email",
-                "target": "gmail"
+                "target": "gmail",
+                "query": {"count": 1}
             }
 
         parsed_file = self._parse_send_file_command(original_command, lower_command)
