@@ -33,7 +33,10 @@ def process_nlp(command, current_app="notepad"):
     # 🧠 STEP 1: EXPLICIT APP DETECTION
     # =========================================
     
-    if "word" in cmd or "ms word" in cmd:
+
+    if any(x in cmd for x in ["powerpoint", "presentation", "slide", "title", "content"]):
+        result["app"] = "powerpoint"
+    elif "word" in cmd or "ms word" in cmd:
         result["app"] = "word"
     elif "spotify" in cmd or "music" in cmd or "song" in cmd:
         result["app"] = "spotify"
@@ -49,6 +52,92 @@ def process_nlp(command, current_app="notepad"):
         # 🔥 THE MAGIC TRICK: If they didn't specify an app, use the Memory!
         result["app"] = current_app
 
+    # =========================================
+    # 📊 POWERPOINT LOGIC (TOP PRIORITY)
+    # =========================================
+    # 🔥 Added 'next', 'previous', 'go to', and 'show' to the trigger list
+    powerpoint_keywords = ["powerpoint", "presentation", "slide", "title", "content", "subtitle", "next", "previous", "go to", "show"]
+    
+    if any(x in cmd for x in powerpoint_keywords):
+        result["app"] = "powerpoint"
+        
+        if "open" in cmd: 
+            result["action"] = "open"
+            # No 'return' here? It might fall through! Add one:
+            return result 
+
+        elif "close" in cmd: 
+            result["action"] = "close"
+            return result
+
+        elif "add slide" in cmd or "new slide" in cmd: 
+            result["action"] = "add_slide"
+            return result
+
+        elif "subtitle" in cmd:
+            result["action"] = "set_subtitle"
+            result["text"] = re.sub(r'(?i).*subtitle\s+(?:to\s+)?', '', raw_text_command).strip()
+            return result 
+            
+        elif "title" in cmd:
+            result["action"] = "set_title"
+            result["text"] = re.sub(r'(?i).*title\s+(?:to\s+)?', '', raw_text_command).strip()
+            return result 
+
+        elif "content" in cmd:
+            result["action"] = "set_content"
+            result["text"] = re.sub(r'(?i).*content\s+(?:to\s+)?', '', raw_text_command).strip()
+            return result 
+        
+        elif "delete" in cmd or "remove" in cmd:
+            result["action"] = "delete_slide"
+            match = re.search(r"slide\s+(\d+)", cmd)
+            if match:
+                result["text"] = match.group(1) 
+            return result
+        
+        elif any(x in cmd for x in ["go to", "next", "previous", "show"]):
+            result["action"] = "navigate"
+            if "next" in cmd:
+                result["text"] = "next"
+            elif "previous" in cmd or "back" in cmd:
+                result["text"] = "previous"
+            else:
+                match = re.search(r"slide\s+(\d+)", cmd)
+                if match:
+                    result["text"] = match.group(1)
+            return result
+    
+        elif any(x in cmd for x in ["slideshow", "present", "start show"]):
+            result["action"] = "start_slideshow"
+            return result
+            
+        return result
+        
+    # -----------------------------------------
+    # 📝 NOTEPAD LOGIC (The Final Fallback)
+    # -----------------------------------------
+    
+    # 1. Check for explicit Notepad commands
+    if "notepad" in cmd:
+        result["app"] = "notepad"
+
+    # 2. Writing Logic (Preserve Casing)
+    if "write" in cmd or "type" in cmd:
+        text_to_write = re.sub(r'^(write|type|add)\s+', '', raw_text_command, flags=re.IGNORECASE).strip()
+        return {"app": result["app"] or "notepad", "action": "write", "text": text_to_write}
+
+    # 3. Simple Add/Insert Fallback
+    if "add" in cmd or "insert" in cmd:
+        # If we didn't return PowerPoint above, this will now default to Notepad
+        text = cmd.replace("insert", "").replace("add", "").strip()
+        return {"app": "notepad", "action": "insert", "text": text}
+
+    # 4. Final safety catch-all
+    if result["app"] is None:
+        result["app"] = "notepad"
+
+    
 
    # -----------------------------------------
     # 📄 MS WORD LOGIC (Optimized & Smart)
@@ -419,12 +508,13 @@ def process_nlp(command, current_app="notepad"):
         return {"app": "calculator", "action": "close"}
 
     # 🔥 ADVANCED MATH COMMANDS (MUST BE ABOVE BASIC MATH)
-    if any(word in cmd for word in ["square", "root", "factorial", "pi", "power"]):
+    # Use \b to ensure it matches the whole word only, not parts of "powerpoint"
+    if re.search(r"\b(square|root|factorial|pi|power)\b", cmd):
         return {
             "app": "calculator",
             "action": "calculate",
-            "expression": None   # Force calculator.py to handle the advanced logic
-        }   
+            "expression": None   
+        }
 
     # ➕ BASIC MATH COMMANDS
     if any(word in cmd for word in ["calculate", "what is", "+", "-", "*", "/", "divide", "multiply"]):
@@ -627,6 +717,7 @@ def process_nlp(command, current_app="notepad"):
             "contact": name
         }
 
+        return result # 🔥 CRITICAL: This stops it from falling into Notepad!
     # 📂 FILE & FOLDER OPERATIONS (NEW)
     # =========================================
     

@@ -1,8 +1,7 @@
 from apps.notepad import *
 from apps.calculator import *
-from apps.vscode import open_vscode, close_vscode
 from apps.word import *
-from apps.powerpoint import open_powerpoint, close_powerpoint
+from apps.powerpoint import *
 from apps.spotify import *
 from apps.whatsapp import *
 from common import find_document, resolve_contact
@@ -255,16 +254,6 @@ def execute_action(data, original_command=""):
           
 
     # ==============================
-    # 💻 VS CODE
-    # ==============================
-    elif app == "vscode":
-        if action == "open":
-            open_vscode()
-        elif action == "close":
-            close_vscode()
-        return True
-
-    # ==============================
     # 📄 WORD
     # ==============================
     elif app == "word":
@@ -344,15 +333,38 @@ def execute_action(data, original_command=""):
         return True
 
     # ==============================
-    # 📊 POWERPOINT
+    # 📄 POWERPOINT
     # ==============================
+    # Inside execute_action function:
     elif app == "powerpoint":
         if action == "open":
             open_powerpoint()
+        elif action == "add_slide":
+            add_slide()
+        elif action == "delete_slide":
+            # 🔥 Pass the slide number (text) to the function
+            delete_slide(data.get("text"))
+        elif action == "navigate":
+            # 🔥 FIX: You must actually call the function here!
+            target = data.get("text")
+            if target:
+                navigate_slide(target)
+        elif action == "set_title":
+            # 🎯 Make sure we use data.get("text")
+            msg = data.get("text") 
+            if msg:
+                set_slide_title(msg)
+            else:
+                print("⚠️ JARVIS: Found 'title' command but text was empty.")
+        elif action == "set_subtitle": # 🔥 NEW CONNECTION
+            set_slide_subtitle(data.get("text"))
+        elif action == "set_content": # 🔥 NEW CONNECTION
+            set_slide_content(data.get("text"))
+        
         elif action == "close":
             close_powerpoint()
         return True
-
+    
     # ==============================
     # 🎵 SPOTIFY
     # ==============================

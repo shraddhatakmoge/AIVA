@@ -1,7 +1,232 @@
-from common import open_app_by_name, close_app
+import os
+import time
+import pyautogui
+import pygetwindow as gw
+import win32com.client
+from common import close_app
 
+# -------- FOCUS POWERPOINT --------
+def focus_pp():
+    windows = gw.getWindowsWithTitle("PowerPoint")
+    for win in windows:
+        try:
+            if win.isMinimized: win.restore()
+            win.activate()
+            return True
+        except: continue
+    return False
+
+# -------- OPEN --------
 def open_powerpoint():
-    open_app_by_name("POWERPNT.EXE")
+    
+    if focus_pp():
+        print("✅ JARVIS: PowerPoint is already open.")
+        return
+    
+    print("🚀 JARVIS: Opening PowerPoint...")
+    os.startfile("powerpnt")
+    time.sleep(5)
+    pyautogui.press('enter') # Bypass the 'Blank Presentation' screen
 
+# -------- ADD SLIDE --------
+def add_slide(layout_index=1):
+    focus_pp()
+    """Layout 1 is usually 'Title and Content'"""
+    try:
+        pp_app = win32com.client.GetActiveObject("PowerPoint.Application")
+        presentation = pp_app.ActivePresentation
+        # Add a new slide at the end
+        slide_count = presentation.Slides.Count
+        new_slide = presentation.Slides.Add(slide_count + 1, layout_index)
+        print(f"✅ JARVIS: Added slide {slide_count + 1}")
+    except Exception as e:
+        print(f"❌ Error adding slide: {e}")
+
+# -------- SET TITLE --------
+def set_slide_title(text):
+    focus_pp()
+    try:
+        # Connect to the active PowerPoint window
+        pp_app = win32com.client.GetActiveObject("PowerPoint.Application")
+        # Get the slide currently on your screen
+        slide = pp_app.ActiveWindow.View.Slide
+        
+        # 1. Try to find the built-in Title placeholder
+        try:
+            slide.Shapes.Title.TextFrame.TextRange.Text = text
+            print(f"✅ JARVIS: Title set to '{text}'")
+        except:
+            # 2. Fallback: Search all shapes for a text box
+            for shape in slide.Shapes:
+                if shape.HasTextFrame:
+                    shape.TextFrame.TextRange.Text = text
+                    print(f"✅ JARVIS: Text set in available box: '{text}'")
+                    return
+    except Exception as e:
+        print(f"❌ PowerPoint Error: {e}")
+        
+
+# -------- SET CONTENT --------
+def set_slide_content(text):
+    try:
+        pp_app = win32com.client.GetActiveObject("PowerPoint.Application")
+        slide = pp_app.ActiveWindow.View.Slide
+        
+        found_box = False
+        for shape in slide.Shapes:
+            # Look for Body/Content placeholders
+            if shape.HasTextFrame and (shape.Type == 2 or "Content" in shape.Name):
+                shape.TextFrame.TextRange.Text = text
+                found_box = True
+                print(f"✅ JARVIS: Content set!")
+                break
+        
+        # 🔥 IF NO BOX FOUND: Create a new text box automatically!
+        if not found_box:
+            print("⚠️ No box found. Creating a new one for you...")
+            # Left=100, Top=150, Width=500, Height=300
+            new_box = slide.Shapes.AddTextbox(Orientation=1, Left=100, Top=150, Width=500, Height=300)
+            new_box.TextFrame.TextRange.Text = text
+            print("✅ JARVIS: Created a new box and added the content.")
+            
+    except Exception as e:
+        print(f"❌ PowerPoint Content Error: {e}")
+        
+# -------- SET SUBTITLE -------------
+def set_slide_subtitle(text):
+    """Scans shapes but specifically targets 'Subtitle' while ignoring 'Title'."""
+    focus_pp()
+    try:
+        pp_app = win32com.client.GetActiveObject("PowerPoint.Application")
+        slide = pp_app.ActiveWindow.View.Slide
+        
+        found_subtitle = False
+        print(f"🔍 JARVIS: Scanning {slide.Shapes.Count} shapes for Subtitle...")
+
+        for shape in slide.Shapes:
+            shape_name = shape.Name.lower()
+            
+            # 🎯 THE FIX: Only skip if it's the MAIN Title. 
+            # If the name has 'subtitle' in it, we WANT to use it!
+            if "subtitle" in shape_name:
+                shape.TextFrame.TextRange.Text = text
+                found_subtitle = True
+                print(f"✅ JARVIS: Found explicit subtitle box: {shape.Name}")
+                break
+                
+            if "title" in shape_name:
+                print(f"⏭️ Skipping: {shape.Name} (Main Title box)")
+                continue
+            
+            # Fallback for the second box if it doesn't have a standard name
+            if shape.HasTextFrame and not found_subtitle:
+                shape.TextFrame.TextRange.Text = text
+                found_subtitle = True
+                print(f"✅ JARVIS: Found secondary box: {shape.Name}")
+                break
+        
+        if not found_subtitle:
+            print("⚠️ JARVIS: I checked every box, but couldn't find a valid subtitle placeholder.")
+                
+    except Exception as e:
+        print(f"❌ PowerPoint Subtitle Error: {e}")
+
+# --------- DELETE SLIDE -------------        
+def delete_slide(slide_no=None):
+    """Deletes either a specific slide number or the current active slide."""
+    focus_pp()
+    try:
+        pp_app = win32com.client.GetActiveObject("PowerPoint.Application")
+        presentation = pp_app.ActivePresentation
+        
+        if slide_no:
+            # Delete by specific number (1-based index)
+            presentation.Slides(int(slide_no)).Delete()
+            print(f"✅ JARVIS: Deleted slide number {slide_no}")
+        else:
+            # Delete the one currently on screen
+            current_index = pp_app.ActiveWindow.View.Slide.SlideIndex
+            presentation.Slides(current_index).Delete()
+            print(f"✅ JARVIS: Deleted current slide ({current_index})")
+            
+    except Exception as e:
+        print(f"❌ PowerPoint Delete Error: {e}")
+        
+        
+# -------- NAVIGATE SLIDE -------------
+def navigate_slide(target):
+    """Handles jumping to next, previous, or specific slide numbers."""
+    focus_pp()
+    try:
+        pp_app = win32com.client.GetActiveObject("PowerPoint.Application")
+        view = pp_app.ActiveWindow.View
+        presentation = pp_app.ActivePresentation
+        current_index = view.Slide.SlideIndex
+
+        if target == "next":
+            if current_index < presentation.Slides.Count:
+                view.GotoSlide(current_index + 1)
+                print(f"✅ JARVIS: Moved to slide {current_index + 1}")
+        elif target == "previous":
+            if current_index > 1:
+                view.GotoSlide(current_index - 1)
+                print(f"✅ JARVIS: Moved to slide {current_index - 1}")
+        else:
+            # If target is a number like "3"
+            slide_no = int(target)
+            view.GotoSlide(slide_no)
+            print(f"✅ JARVIS: Jumped to slide {slide_no}")
+    except Exception as e:
+        print(f"❌ PowerPoint Navigation Error: {e}")
+                
+    except Exception as e:
+        print(f"❌ PowerPoint Navigation Error: {e}")
+        
+# -------- NAVIGATE SLIDE -------------
+def navigate_slide(target):
+    """Handles jumping to next, previous, or specific slide numbers."""
+    focus_pp()
+    try:
+        pp_app = win32com.client.GetActiveObject("PowerPoint.Application")
+        
+        # Check if a slideshow is running to get the correct view
+        if pp_app.SlideShowWindows.Count > 0:
+            view = pp_app.SlideShowWindow(1).View
+        else:
+            view = pp_app.ActiveWindow.View
+            
+        presentation = pp_app.ActivePresentation
+        current_index = view.Slide.SlideIndex
+
+        if target == "next":
+            if current_index < presentation.Slides.Count:
+                view.GotoSlide(current_index + 1)
+                print(f"✅ JARVIS: Moved to slide {current_index + 1}")
+        elif target == "previous":
+            if current_index > 1:
+                view.GotoSlide(current_index - 1)
+                print(f"✅ JARVIS: Moved to slide {current_index - 1}")
+        else:
+            # If target is a number like "3"
+            slide_no = int(target)
+            view.GotoSlide(slide_no)
+            print(f"✅ JARVIS: Jumped to slide {slide_no}")
+            
+    except Exception as e:
+        print(f"❌ PowerPoint Navigation Error: {e}")
+
+# --------- SLIDESHOW -----------
+def start_slideshow():
+    """Starts the full-screen presentation mode."""
+    focus_pp()
+    try:
+        pp_app = win32com.client.GetActiveObject("PowerPoint.Application")
+        pp_app.ActivePresentation.SlideShowSettings.Run()
+        print("📺 JARVIS: Slideshow started!")
+    except Exception as e:
+        print(f"❌ PowerPoint Slideshow Error: {e}")
+
+# -------- CLOSE --------
 def close_powerpoint():
+    focus_pp()
     close_app("POWERPNT.EXE")
