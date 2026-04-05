@@ -42,7 +42,7 @@ class DriverManager:
         chrome_options = Options()
 
         # 🔥 ADD THIS LINE
-        chrome_options.page_load_strategy = "eager"
+        chrome_options.page_load_strategy = "normal"
         chrome_options.add_argument("--start-maximized")
 
         # -------------------------------------------------

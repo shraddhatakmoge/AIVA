@@ -245,6 +245,31 @@ If subject/body not provided:
 → DO NOT guess
 → leave them empty
 
+------------------------------
+MOOD / EMOTION HANDLING
+------------------------------
+If user expresses emotion like:
+- I feel sad
+- I feel terrible
+- I am depressed
+- I feel lonely
+- bad day
+- not feeling good
+
+→ action = "handle_mood"
+→ query = {"mood": "sad"}
+
+If user expresses:
+- happy → mood = "happy"
+- stressed / anxious → mood = "stressed"
+- bored → mood = "bored"
+
+IMPORTANT:
+DO NOT invent new actions like:
+- "express sympathy"
+- "comfort user"
+
+ONLY use: handle_mood
 ==================================================
 CRITICAL CONSTRAINTS
 ==================================================

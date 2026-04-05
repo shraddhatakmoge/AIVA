@@ -15,8 +15,14 @@ class Gmail:
         self.driver = driver
         self.service = self.authenticate()
 
+        # 🔥 NEW: local memory to avoid duplicates
+        self.read_ids = set()
+
     def authenticate(self):
-        SCOPES = ['https://www.googleapis.com/auth/gmail.send']
+        SCOPES = [
+            'https://www.googleapis.com/auth/gmail.send',
+            'https://www.googleapis.com/auth/gmail.modify'
+        ]
 
         # 🔥 Get ROOT directory (AIVA-shra)
         BASE_DIR = os.path.abspath(
@@ -109,6 +115,87 @@ class Gmail:
                 "status": "error",
                 "response": str(e)
             }
+
+    def read_latest_emails(self, count=1):
+
+        try:
+            # 🔥 LIMIT SAFE RANGE
+            count = max(1, min(count, 5))  # 1 to 5 only
+
+            results = self.service.users().messages().list(
+                userId='me',
+                maxResults=count,
+                q="is:unread"
+            ).execute()
+
+            messages = results.get('messages', [])
+
+            if not messages:
+                return {
+                    "status": "error",
+                    "response": "No new unread emails."
+                }
+
+            output = []
+            count_added = 0
+
+            for msg_data in messages:
+
+                msg_id = msg_data['id']
+
+                # 🔥 SKIP already read emails
+                if msg_id in self.read_ids:
+                    continue
+
+                msg = self.service.users().messages().get(
+                    userId='me',
+                    id=msg_id,
+                    format='metadata',
+                    metadataHeaders=['Subject', 'From']
+                ).execute()
+
+                headers = msg['payload']['headers']
+
+                subject = next((h['value'] for h in headers if h['name'] == 'Subject'), "No Subject")
+                sender = next((h['value'] for h in headers if h['name'] == 'From'), "Unknown")
+
+                count_added += 1
+                output.append(f"{count_added}. From {sender} — {subject}")
+
+                # 🔥 STORE LOCALLY
+                self.read_ids.add(msg_id)
+
+                # 🔥 ALSO mark in Gmail
+                self.mark_as_read(msg_id)
+
+                if count_added >= count:
+                    break
+            if not output:
+                return {
+                    "status": "info",
+                    "response": "No new unread emails."
+                }
+
+            return {
+                "status": "success",
+                "response": "\n".join(output)
+            }
+
+
+        except Exception as e:
+            return {
+                "status": "error",
+                "response": str(e)
+            }
+
+
+    def mark_as_read(self, msg_id):
+        self.service.users().messages().modify(
+            userId='me',
+            id=msg_id,
+            body={'removeLabelIds': ['UNREAD']}
+        ).execute()
+
 
     def send_email(self, to, subject, body, attachment_path=None):
         try:

@@ -203,24 +203,30 @@ class Spotify:
             self.driver.execute_script("window.focus();")
 
             # 🔥 CLICK PLAY BUTTON DIRECTLY (MOST RELIABLE)
-            play_buttons = self.driver.find_elements(
-                By.XPATH,
-                "//button[@data-testid='play-button']"
-            )
+            # 🔥 CLICK FIRST TRACK PLAY BUTTON
+            try:
+                first_track_play = wait.until(
+                    EC.element_to_be_clickable((
+                        By.XPATH,
+                        "(//div[@data-testid='tracklist-row'])[1]//button[@data-testid='play-button']"
+                    ))
+                )
 
-            if play_buttons:
-                self.driver.execute_script("arguments[0].click();", play_buttons[0])
-            else:
-                # fallback → double click track
+                self.driver.execute_script("arguments[0].click();", first_track_play)
+
+            except Exception:
+                # fallback → double click track row
                 actions = ActionChains(self.driver)
                 actions.move_to_element(first_track).double_click().perform()
 
-            time.sleep(3)
+            time.sleep(2)
 
-            time.sleep(3)
+            # 🔥 simulate user interaction (helps autoplay)
+            self.driver.execute_script("document.body.click();")
+            time.sleep(1)
 
-            # 🔥 FORCE PLAY BUTTON CLICK (MORE RELIABLE)
-            for _ in range(3):
+            # 🔥 ensure playback starts
+            for _ in range(5):
                 if self._is_playing():
                     break
 
@@ -229,8 +235,8 @@ class Spotify:
                     self.driver.execute_script("arguments[0].click();", play_btn)
 
                 time.sleep(1)
-            # 🔥 SOFT CHECK (DON’T FAIL HARD)
-            time.sleep(3)
+
+            time.sleep(2)
 
             if not self._is_playing():
                 print("⚠️ Playback might not have started")
@@ -343,11 +349,32 @@ class Spotify:
         return self.memory.remove_favorite(song)
 
     def play_favorite(self):
-        favorite = self.memory.get_random_favorite()
-        if not favorite:
-            return {"status": "error", "response": "No favorites saved."}
 
-        return self.play(favorite["song"])
+        favorites = self.memory.get_all_favorites()
+
+        # 🔥 NO FAVORITES CASE (MAIN FIX)
+        if not favorites:
+            return {
+                "status": "info",
+                "response": "No favorite songs found on Spotify. You can play a song and then add it to favorites."
+            }
+
+        # 🔥 PICK RANDOM
+        favorite = self.memory.get_random_favorite()
+
+        # HANDLE dict / string
+        if isinstance(favorite, dict):
+            song = favorite.get("song")
+        else:
+            song = favorite
+
+        if not song:
+            return {
+                "status": "error",
+                "response": "Invalid favorite format."
+            }
+
+        return self.play(song)
 
     def play_last(self):
         last = self.memory.get_last_played()
