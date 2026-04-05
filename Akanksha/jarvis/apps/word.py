@@ -241,8 +241,12 @@ word_colors = {
 
 # -------- 11. STYLE SPECIFIC (SMART ENGINE) --------
 def style_specific_text(target_text, style_type=None, color_name=None, font_size=None):
-    print(f"🚀 JARVIS: Preparing to style '{target_text}'...")
+    # 🛡️ Safety Guard: Don't try to style if no word was found
+    if not target_text or target_text == "None":
+        print("❌ JARVIS: No target word specified for styling.")
+        return
     
+    print(f"🚀 JARVIS: Preparing to style '{target_text}'...")
     try:
         # 1. ATTEMPT TO CONNECT OR LAUNCH WORD
         try:

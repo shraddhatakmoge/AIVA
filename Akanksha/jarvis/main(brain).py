@@ -50,6 +50,7 @@ def execute_action(data, original_command=""):
     line = data.get("line")
     direction = data.get("direction")
     contact = data.get("contact")
+    size = data.get("size")
 
     # ==============================
     # 📂 FILE SYSTEM (NEW)
@@ -451,8 +452,7 @@ def process_command(command):
     # Standardize input
     command = command.lower().strip()
 
-    # Split the sentence into multiple parts
-    parts = re.split(r'\b(?:and then|then|and)\b', command)
+    parts = re.split(r'\b(?:and then|then)\b', command)
     
     for part in parts:
         part = part.strip().strip(',').strip('.') 
