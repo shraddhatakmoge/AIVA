@@ -204,6 +204,8 @@ def execute_action(data, original_command=""):
 
         elif action == "voice_note":
             send_voice_message(contact)
+        elif action == "stop_voice":
+            stop_voice_message()
 
         # In main(brain).py under the WhatsApp section:
         elif action == "send_attachment":
@@ -352,7 +354,7 @@ def execute_action(data, original_command=""):
         elif action == "apply_theme":
             apply_presentation_theme(text)
         elif action == "stop_slideshow":
-            stop_slideshow()
+            stop_slideshow()    
         elif action == "navigate":
             # 🔥 FIX: You must actually call the function here!
             target = data.get("text")
@@ -479,7 +481,6 @@ def process_command(command):
         part = part.strip().strip(',').strip('.') 
         if not part: continue
         
-        print(f"🤖 JARVIS processing: {part}")
         
         # 1. 👁️ LOOK AT THE SCREEN: Is the user physically looking at Word or Notepad?
         on_screen = get_active_app()
@@ -489,6 +490,8 @@ def process_command(command):
         # 2. 🧠 PASS THE MEMORY TO NLP
         # This tells the brain: "Hey, we are currently focused on [Word]!"
         nlp_data = process_nlp(part, CURRENT_APP_STATE) 
+        
+        print("📊 NLP RESULT:", nlp_data)   
         
         # 3. 💾 UPDATE MEMORY IF APP CHANGED
         # If the user explicitly said "open notepad", update the memory!

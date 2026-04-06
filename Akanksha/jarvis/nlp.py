@@ -34,7 +34,7 @@ def process_nlp(command, current_app="notepad"):
     # =========================================
     
 
-    if any(x in cmd for x in ["powerpoint", "presentation", "slide", "title", "content"]):
+    if any(x in cmd for x in ["powerpoint", "presentation","ppt", "slide", "title", "content"]):
         result["app"] = "powerpoint"
     elif "word" in cmd or "ms word" in cmd:
         result["app"] = "word"
@@ -538,6 +538,23 @@ def process_nlp(command, current_app="notepad"):
     elif "close whatsapp" in cmd:
         return {"app": "whatsapp", "action": "close"}
 
+    elif "voice message" in cmd or "voice note" in cmd:
+        match = re.search(r"voice (?:message|note)(?: to)? (.+)", cmd)
+
+        contact = None
+        if match:
+            contact = match.group(1).strip()
+
+        return {
+            "app": "whatsapp",
+            "action": "voice_note",
+            "contact": contact
+        }   
+
+    # 🛑 STOP RECORDING
+    elif "stop recording" in cmd or "stop voice" in cmd:
+        return {"app": "whatsapp", "action": "stop_voice"}
+    
     # 💬 SEND MESSAGE TO CONTACT (SMARTER REGEX)
     elif "message to" in cmd or "whatsapp to" in cmd:
         try:
@@ -560,6 +577,9 @@ def process_nlp(command, current_app="notepad"):
             }
         except:
             pass
+
+
+    
 
     # SEND NORMAL MESSAGE
     elif "send message" in cmd:
@@ -618,21 +638,7 @@ def process_nlp(command, current_app="notepad"):
             "contact": contact
         }
 
-    # 💬 WHATSAPP VOICE MESSAGE
-    if "voice message" in cmd or "voice note" in cmd:
-        result["app"] = "whatsapp"
-        result["action"] = "voice_note"
-
-        words = cmd.split()
-
-        if "to" in words:
-            idx = words.index("to")
-            if idx + 1 < len(words):
-                result["contact"] = words[idx + 1]
-        else:
-            result["contact"] = words[-1]
-
-        return result
+    
         
     # 📩 READ WHATSAPP MESSAGES
     if "read" in cmd and "message" in cmd:
