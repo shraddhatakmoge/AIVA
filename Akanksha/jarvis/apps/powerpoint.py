@@ -23,7 +23,7 @@ def open_powerpoint():
         print("✅ JARVIS: PowerPoint is already open.")
         return
     
-    print("🚀 JARVIS: Opening PowerPoint...")
+    
     os.startfile("powerpnt")
     time.sleep(5)
     pyautogui.press('enter') # Bypass the 'Blank Presentation' screen
@@ -111,18 +111,18 @@ def set_slide_subtitle(text):
             if "subtitle" in shape_name:
                 shape.TextFrame.TextRange.Text = text
                 found_subtitle = True
-                print(f"✅ JARVIS: Found explicit subtitle box: {shape.Name}")
+               
                 break
                 
             if "title" in shape_name:
-                print(f"⏭️ Skipping: {shape.Name} (Main Title box)")
+                
                 continue
             
             # Fallback for the second box if it doesn't have a standard name
             if shape.HasTextFrame and not found_subtitle:
                 shape.TextFrame.TextRange.Text = text
                 found_subtitle = True
-                print(f"✅ JARVIS: Found secondary box: {shape.Name}")
+             
                 break
         
         if not found_subtitle:
@@ -191,7 +191,7 @@ def navigate_slide(target):
 def start_slideshow():
     """Starts the full-screen presentation by pressing F5."""
     if focus_pp():
-        print("📺 JARVIS: Triggering F5 for Slideshow...")
+        
         pyautogui.press('f5')
     else:
         print("❌ JARVIS: PowerPoint is not open to start a show.")
@@ -237,13 +237,11 @@ def apply_presentation_theme(theme_name):
                 return
 
         print(f"❌ JARVIS: Could not find theme '{theme_name}' on your disk.")
-        print("💡 Tip: Try typing the theme name exactly as it appears in the 'Design' tab.")
             
     except Exception as e:
         print(f"❌ PowerPoint Theme Error: {e}")
         
 # -------- CLOSE --------
 def close_powerpoint():
-    """Safely closes the PowerPoint application."""
-    focus_pp()
-    close_app("POWERPNT.EXE")
+    print("❌ Closing PowerPoint...")
+    close_app("POWERPNT")
