@@ -153,43 +153,14 @@ def delete_slide(slide_no=None):
         print(f"❌ PowerPoint Delete Error: {e}")
         
         
-# -------- NAVIGATE SLIDE -------------
-def navigate_slide(target):
-    """Handles jumping to next, previous, or specific slide numbers."""
-    focus_pp()
-    try:
-        pp_app = win32com.client.GetActiveObject("PowerPoint.Application")
-        view = pp_app.ActiveWindow.View
-        presentation = pp_app.ActivePresentation
-        current_index = view.Slide.SlideIndex
-
-        if target == "next":
-            if current_index < presentation.Slides.Count:
-                view.GotoSlide(current_index + 1)
-                print(f"✅ JARVIS: Moved to slide {current_index + 1}")
-        elif target == "previous":
-            if current_index > 1:
-                view.GotoSlide(current_index - 1)
-                print(f"✅ JARVIS: Moved to slide {current_index - 1}")
-        else:
-            # If target is a number like "3"
-            slide_no = int(target)
-            view.GotoSlide(slide_no)
-            print(f"✅ JARVIS: Jumped to slide {slide_no}")
-    except Exception as e:
-        print(f"❌ PowerPoint Navigation Error: {e}")
-                
-    except Exception as e:
-        print(f"❌ PowerPoint Navigation Error: {e}")
-        
-# -------- NAVIGATE SLIDE -------------
+# -------- NAVIGATOR SLIDESHOW -------------
 def navigate_slide(target):
     """Handles jumping to next, previous, or specific slide numbers."""
     focus_pp()
     try:
         pp_app = win32com.client.GetActiveObject("PowerPoint.Application")
         
-        # Check if a slideshow is running to get the correct view
+        # 1. Detect View: Are we in a Slideshow or the Editor?
         if pp_app.SlideShowWindows.Count > 0:
             view = pp_app.SlideShowWindow(1).View
         else:
@@ -198,6 +169,7 @@ def navigate_slide(target):
         presentation = pp_app.ActivePresentation
         current_index = view.Slide.SlideIndex
 
+        # 2. Execute Navigation
         if target == "next":
             if current_index < presentation.Slides.Count:
                 view.GotoSlide(current_index + 1)
@@ -207,7 +179,7 @@ def navigate_slide(target):
                 view.GotoSlide(current_index - 1)
                 print(f"✅ JARVIS: Moved to slide {current_index - 1}")
         else:
-            # If target is a number like "3"
+            # Handle numbers like "slide 3"
             slide_no = int(target)
             view.GotoSlide(slide_no)
             print(f"✅ JARVIS: Jumped to slide {slide_no}")
@@ -215,18 +187,63 @@ def navigate_slide(target):
     except Exception as e:
         print(f"❌ PowerPoint Navigation Error: {e}")
 
-# --------- SLIDESHOW -----------
+# ------- SLIDESHOW --------------
 def start_slideshow():
-    """Starts the full-screen presentation mode."""
+    """Starts the full-screen presentation by pressing F5."""
+    if focus_pp():
+        print("📺 JARVIS: Triggering F5 for Slideshow...")
+        pyautogui.press('f5')
+    else:
+        print("❌ JARVIS: PowerPoint is not open to start a show.")
+
+def stop_slideshow():
+    """Exits the slideshow mode by pressing Escape."""
+    if focus_pp():
+        print("🛑 JARVIS: Stopping Slideshow...")
+        pyautogui.press('esc')
+    else:
+        print("❌ JARVIS: PowerPoint not found.")
+
+# Note: Your existing navigate_slide already handles 'next' and 'previous' 
+# by checking if a SlideshowWindow exists!
+       
+# --------- APPLY THEME ------------ 
+def apply_presentation_theme(theme_name):
     focus_pp()
     try:
         pp_app = win32com.client.GetActiveObject("PowerPoint.Application")
-        pp_app.ActivePresentation.SlideShowSettings.Run()
-        print("📺 JARVIS: Slideshow started!")
-    except Exception as e:
-        print(f"❌ PowerPoint Slideshow Error: {e}")
+        presentation = pp_app.ActivePresentation
+        
+        # 🟢 STEP 1: Try the direct name (Works for some Office 365 versions)
+        try:
+            presentation.ApplyTemplate(theme_name)
+            print(f"🎨 JARVIS: Applied theme '{theme_name}' directly.")
+            return
+        except:
+            pass
 
+        # 🟢 STEP 2: Try common Windows Theme Paths (The "Brute Force" search)
+        user_profile = os.environ['USERPROFILE']
+        possible_paths = [
+            f"C:\\Program Files\\Microsoft Office\\root\\Document Themes 16\\{theme_name}.thmx",
+            f"C:\\Program Files (x86)\\Microsoft Office\\root\\Document Themes 16\\{theme_name}.thmx",
+            f"{user_profile}\\AppData\\Roaming\\Microsoft\\Templates\\Document Themes\\{theme_name}.thmx"
+        ]
+
+        for path in possible_paths:
+            if os.path.exists(path):
+                presentation.ApplyTemplate(path)
+                print(f"🎨 JARVIS: Theme applied from {path}")
+                return
+
+        print(f"❌ JARVIS: Could not find theme '{theme_name}' on your disk.")
+        print("💡 Tip: Try typing the theme name exactly as it appears in the 'Design' tab.")
+            
+    except Exception as e:
+        print(f"❌ PowerPoint Theme Error: {e}")
+        
 # -------- CLOSE --------
 def close_powerpoint():
+    """Safely closes the PowerPoint application."""
     focus_pp()
     close_app("POWERPNT.EXE")

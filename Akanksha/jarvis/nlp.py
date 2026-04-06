@@ -53,66 +53,65 @@ def process_nlp(command, current_app="notepad"):
         result["app"] = current_app
 
     # =========================================
-    # 📊 POWERPOINT LOGIC (TOP PRIORITY)
+    # 📊 POWERPOINT LOGIC (Lines 72-130)
     # =========================================
-    # 🔥 Added 'next', 'previous', 'go to', and 'show' to the trigger list
-    powerpoint_keywords = ["powerpoint", "presentation", "slide", "title", "content", "subtitle", "next", "previous", "go to", "show"]
+    powerpoint_keywords = ["powerpoint", "presentation", "slide", "title", "content", "subtitle", "next", "previous", "go to", "show", "slideshow", "present", "theme", "design"]
     
     if any(x in cmd for x in powerpoint_keywords):
         result["app"] = "powerpoint"
         
         if "open" in cmd: 
             result["action"] = "open"
-            # No 'return' here? It might fall through! Add one:
-            return result 
-
         elif "close" in cmd: 
             result["action"] = "close"
-            return result
-
         elif "add slide" in cmd or "new slide" in cmd: 
             result["action"] = "add_slide"
-            return result
-
         elif "subtitle" in cmd:
             result["action"] = "set_subtitle"
             result["text"] = re.sub(r'(?i).*subtitle\s+(?:to\s+)?', '', raw_text_command).strip()
-            return result 
-            
         elif "title" in cmd:
             result["action"] = "set_title"
             result["text"] = re.sub(r'(?i).*title\s+(?:to\s+)?', '', raw_text_command).strip()
-            return result 
-
         elif "content" in cmd:
             result["action"] = "set_content"
             result["text"] = re.sub(r'(?i).*content\s+(?:to\s+)?', '', raw_text_command).strip()
-            return result 
-        
         elif "delete" in cmd or "remove" in cmd:
             result["action"] = "delete_slide"
             match = re.search(r"slide\s+(\d+)", cmd)
-            if match:
-                result["text"] = match.group(1) 
+            result["text"] = match.group(1) if match else None
+        elif any(x in cmd for x in ["slideshow", "present", "start show"]):
+            result["action"] = "start_slideshow"
+        # --- 📊 SLIDESHOW NAVIGATION ---
+        elif any(x in cmd for x in ["next", "forward", "after"]):
+            result["action"] = "navigate"
+            result["text"] = "next"
+            return result
+
+        elif any(x in cmd for x in ["previous", "back", "before"]):
+            result["action"] = "navigate"
+            result["text"] = "previous"
+            return result
+
+        elif any(x in cmd for x in ["stop", "exit", "end"]) and "slideshow" in cmd:
+            result["action"] = "stop_slideshow"
             return result
         
         elif any(x in cmd for x in ["go to", "next", "previous", "show"]):
             result["action"] = "navigate"
-            if "next" in cmd:
-                result["text"] = "next"
-            elif "previous" in cmd or "back" in cmd:
-                result["text"] = "previous"
+            if "next" in cmd: result["text"] = "next"
+            elif "previous" in cmd or "back" in cmd: result["text"] = "previous"
             else:
                 match = re.search(r"slide\s+(\d+)", cmd)
-                if match:
-                    result["text"] = match.group(1)
-            return result
-    
-        elif any(x in cmd for x in ["slideshow", "present", "start show"]):
-            result["action"] = "start_slideshow"
-            return result
-            
+                result["text"] = match.group(1) if match else None
+        elif "theme" in cmd or "design" in cmd:
+            result["action"] = "apply_theme"
+            theme = re.sub(r'(?i).*theme\s+|.*design\s+', '', raw_text_command).strip()
+            result["text"] = theme if theme else "Office Theme"
+        
+        # 🔥 CRITICAL: Stop here so it doesn't fall into Notepad logic!
         return result
+            
+        
         
     # -----------------------------------------
     # 📝 NOTEPAD LOGIC (The Final Fallback)
@@ -277,15 +276,6 @@ def process_nlp(command, current_app="notepad"):
         return {"app": result["app"], "action": "save", "text": match_save.group(1).strip()}
 
 
-    result = {
-        "app": None,
-        "action": None,
-        "text": None,
-        "line": None,
-        "direction": None,
-        "contact": None
-    }
-    
     # =========================================
     # 📝 NOTEPAD SECTION
     # =========================================

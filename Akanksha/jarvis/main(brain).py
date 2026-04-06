@@ -47,6 +47,8 @@ def execute_action(data, original_command=""):
     action = data.get("action")
     text = data.get("text")
     line = data.get("line")
+    style=data.get("style") 
+    color=data.get("color")     
     direction = data.get("direction")
     contact = data.get("contact")
     size = data.get("size")
@@ -341,9 +343,16 @@ def execute_action(data, original_command=""):
             open_powerpoint()
         elif action == "add_slide":
             add_slide()
+        elif action == "start_slideshow": # 🔥 NEW CONNECTION
+            start_slideshow()
         elif action == "delete_slide":
             # 🔥 Pass the slide number (text) to the function
             delete_slide(data.get("text"))
+            
+        elif action == "apply_theme":
+            apply_presentation_theme(text)
+        elif action == "stop_slideshow":
+            stop_slideshow()
         elif action == "navigate":
             # 🔥 FIX: You must actually call the function here!
             target = data.get("text")
