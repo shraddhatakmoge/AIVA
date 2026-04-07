@@ -7,6 +7,7 @@ from apps.whatsapp import *
 from common import find_document, resolve_contact
 from nlp import process_nlp
 from services.file_service import handle_file_command
+# from llm_brain import ask_jarvis_llm
 
 import pygetwindow as gw
 import time
@@ -499,9 +500,15 @@ def process_command(command):
             CURRENT_APP_STATE = nlp_data["app"]
 
         # Validate and Execute
+        # Validate and Execute
         if is_nlp_confident(nlp_data):
+            # If it's a specific app command (WhatsApp, PowerPoint, etc.)
             execute_action(nlp_data, part)
             time.sleep(0.5)
+        # else:
+        #     # 🔥 THE TRUE AI UPGRADE 🔥
+        #     # If the NLP doesn't recognize the command, route it to Gemini!
+        #     ask_jarvis_llm(part)
             
 # ==============================
 # ▶️ RUN
