@@ -123,8 +123,13 @@ def send_screenshot(contact):
     focus_whatsapp()
     time.sleep(1)
 
-    # 🔥 Step 1: Set your screenshot folder
-    folder = r"C:\Users\Akanksha\OneDrive\Pictures\Screenshots"   # 🔧 CHANGE if needed
+    # 🔥 DYNAMIC PATH FIX: Automatically finds the Screenshots folder for ANY user
+    user_profile = os.path.expanduser('~')
+    onedrive_path = os.path.join(user_profile, "OneDrive", "Pictures", "Screenshots")
+    local_path = os.path.join(user_profile, "Pictures", "Screenshots")
+    
+    # Check if their laptop uses OneDrive or Local storage
+    folder = onedrive_path if os.path.exists(onedrive_path) else local_path
 
     path = get_latest_screenshot(folder)
 
