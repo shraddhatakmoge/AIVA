@@ -1,10 +1,8 @@
-import inspect
 import os
 import glob
 from difflib import get_close_matches
 import random
-from selenium.common.exceptions import WebDriverException
-
+from pathlib import Path
 from AIVA.Shra.features.browser.driver import DriverManager
 from AIVA.Shra.features.browser.platforms.youtube import YouTube
 from AIVA.Shra.features.browser.platforms.spotify import Spotify
@@ -12,9 +10,7 @@ from AIVA.Shra.features.browser.platforms.google import Google
 from AIVA.Shra.features.browser.platforms.gmail import Gmail
 from AIVA.Shra.features.browser.platforms.whatsapp import WhatsApp
 from AIVA.Shra.features.browser.window_focus import bring_browser_to_front
-from selenium.webdriver.support.ui import WebDriverWait
-
-
+from contacts import CONTACTS
 
 
 class BrowserController:
@@ -27,29 +23,47 @@ class BrowserController:
         self.pending_email = None
         self.previous_tab = None  # 🔥 NEW
         self.tab_metadata = {}  # 🔥 NEW
+        self.contacts = CONTACTS
+        self.pending_action = None
 
     # -------------------------------------------------
     # ENSURE DRIVER
     # -------------------------------------------------
     def _ensure_driver(self):
-        try:
-            if self.driver:
-                _ = self.driver.current_url
-                return
-        except Exception:
-            print("⚠ Driver session lost. Restarting...")
 
+        if self.driver:
+            try:
+                if self.driver.session_id:
+                    _ = self.driver.title  # ✅ SAFE CHECK
+                    return
+                else:
+                    raise Exception("Invalid session")
+
+            except Exception as e:
+                print("⚠ Driver check failed, retrying once...", e)
+                try:
+                    _ = self.driver.title
+                    return
+                except:
+                    print("⚠ Driver session lost. Restarting...")
+
+        # 🔥 RESET EVERYTHING
         self.driver = DriverManager.get_instance().get_driver()
-        self.platform_instances = {
-            "youtube": YouTube(self.driver),
-            "spotify": Spotify(self.driver),
-            "google": Google(self.driver),
-            "whatsapp": WhatsApp(self.driver),
-            "gmail": Gmail(self.driver),  # 🔥 ADD THIS
-        }
 
+        if not self.platform_instances:
+            self.platform_instances = {
+                "youtube": YouTube(self.driver),
+                "spotify": Spotify(self.driver),
+                "google": Google(self.driver),
+                "whatsapp": WhatsApp(self.driver),
+            }
+
+
+
+        # 🔥 CRITICAL FIX
         self.tabs = {}
-        self.last_active_platform = None
+        self.tab_metadata = {}
+        self.previous_tab = None
 
     # -------------------------------------------------
     # OPEN TAB
@@ -83,12 +97,18 @@ class BrowserController:
     # SWITCH TAB
     # -------------------------------------------------
 
-    def find_file_by_name(self,filename):
+    from pathlib import Path
+
+    def find_file_by_name(self, filename):
+        home = Path.home()
+
         search_dirs = [
-            os.path.join(os.path.expanduser("~"), "Downloads"),
-            os.path.join(os.path.expanduser("~"), "Documents"),
-            os.path.join(os.path.expanduser("~"), "Desktop")
+            home / "Downloads",
+            home / "Documents",
+            home / "Desktop"
         ]
+
+        search_dirs = [str(p) for p in search_dirs if p.exists()]
 
         matches = []
 
@@ -106,18 +126,17 @@ class BrowserController:
 
         try:
             if handle in self.driver.window_handles:
-                # 🔥 STORE PREVIOUS TAB BEFORE SWITCHING
                 self.previous_tab = self.driver.current_window_handle
-
                 self.driver.switch_to.window(handle)
                 self.last_active_platform = target
                 bring_browser_to_front()
                 return True
             else:
-                self.tabs.pop(target, None)
-                return False
-        except WebDriverException:
-            self.tabs.pop(target, None)
+                raise Exception("Handle invalid")
+
+        except Exception:
+            # 🔥 FIX: remove broken handle
+            print(f"⚠ Tab handle invalid, but keeping platform active")
             return False
 
     def switch_to_previous_tab(self):
@@ -169,11 +188,10 @@ class BrowserController:
             return target
 
         # 🔥 2. Context-aware actions → use last active
-        context_actions = ["pause", "resume", "stop", "add_to_favorites"]
+        context_actions = ["pause", "resume", "stop"]
 
-        if action in context_actions:
-            if self.last_active_platform:
-                return self.last_active_platform
+        if action in context_actions and self.last_active_platform:
+            return self.last_active_platform
 
         # 🔥 3. fallback to last active
         if self.last_active_platform:
@@ -305,11 +323,8 @@ You can say:
                 if "send mail to" in user_input:
                     user_input = user_input.replace("send mail to", "").strip()
 
-                # 🔥 APPLY CONTACT MAPPING
-                from contacts import CONTACTS
-
-                if user_input in CONTACTS:
-                    user_input = CONTACTS[user_input]
+                if user_input in self.contacts:
+                    user_input = self.contacts[user_input]
 
                 self.pending_email["to"] = user_input
                 self.pending_email["step"] = "subject"
@@ -557,7 +572,7 @@ You can say:
                 # YES → SEND MAIL
                 # ----------------------
                 if user_lower in ["yes", "y", "send", "send it", "go ahead", "ok", "okay"]:
-                    gmail = Gmail(None)
+                    gmail = Gmail(self.driver)
 
                     to = self.pending_email["to"]
                     subject = self.pending_email["subject"]
@@ -697,6 +712,109 @@ You can say:
 
         action = structured.get("action")
         query = structured.get("query")
+
+        # -------------------------------------------------
+        # 🔥 HANDLE PLATFORM REPLY (spotify / youtube)
+        # -------------------------------------------------
+        if self.pending_action:
+
+            # 🔥 FORCE RAW USER INPUT (CRITICAL FIX)
+            if isinstance(structured, str):
+                user_input = structured.lower()
+
+            else:
+                user_input = (
+                        structured.get("original_command")
+                        or structured.get("query")
+                        or ""
+                )
+
+            user_input = str(user_input).lower().strip()
+
+            print("🔥 FINAL INPUT:", user_input)
+
+            # 🔥 SAFETY
+            if not user_input:
+                return {
+                    "status": "ask",
+                    "response": "Please say Spotify or YouTube."
+                }
+
+            # ---------------- SPOTIFY ----------------
+            if "spotify" in user_input:
+
+                try:
+                    print("🔥 Spotify flow started")
+
+                    self._ensure_driver()
+
+                    platform = self.platform_instances.get("spotify")
+                    print("DEBUG platform:", platform)
+
+                    if not platform:
+                        return {
+                            "status": "error",
+                            "response": "Spotify not initialized."
+                        }
+
+                    if "spotify" not in self.tabs:
+                        print("📂 Opening Spotify tab")
+                        self._open_new_tab("spotify")
+                    else:
+                        print("🔁 Switching to Spotify tab")
+                        self._switch_to_tab("spotify")
+
+                    self.last_active_platform = "spotify"
+                    self.pending_action = None
+
+                    print("🎧 Calling play_favorite()")
+
+                    result = platform.play_favorite()
+
+                    print("✅ RESULT:", result)
+
+                    if not result:
+                        return {
+                            "status": "error",
+                            "response": "Spotify returned no response."
+                        }
+
+                    if result.get("status") == "login_required":
+                        return {
+                            "status": "info",
+                            "response": "Please login to Spotify first."
+                        }
+
+                    return result
+
+                except Exception as e:
+                    print("❌ Spotify crash:", e)
+
+                    return {
+                        "status": "error",
+                        "response": f"Spotify failed: {str(e)}"
+                    }
+            # ---------------- YOUTUBE ----------------
+            elif "youtube" in user_input or "yt" in user_input:
+
+                self._ensure_driver()  # 🔥 CRITICAL FIX
+
+                platform = self.platform_instances.get("youtube")
+
+                if "youtube" not in self.tabs:
+                    self._open_new_tab("youtube")
+                else:
+                    self._switch_to_tab("youtube")
+
+                self.last_active_platform = "youtube"
+                self.pending_action = None
+
+                return platform.play_favorite()
+
+            return {
+                "status": "ask",
+                "response": "Please say Spotify or YouTube."
+            }
         # -------------------------------------------------
         # 🔥 MOOD HANDLER (NEW FEATURE)
         # -------------------------------------------------
@@ -760,13 +878,101 @@ You can say:
                 "status": "error",
                 "response": "Google tab not found"
             }
+        # -------------------------------------------------
+        # 🔥 FIX: ADD TO FAVORITES (CRITICAL FIX)
+        # -------------------------------------------------
+        if action == "add_to_favorites":
+
+
+
+            target = self.last_active_platform
+            platform = self.platform_instances.get(target)
+
+            if not platform:
+                return {
+                    "status": "error",
+                    "response": "No active platform."
+                }
+
+            # 🔥 USE CURRENT SONG INSTEAD OF QUERY
+            if hasattr(platform, "current_song") and platform.current_song:
+                return platform.memory.add_favorite(platform.current_song)
+
+            return {
+                "status": "error",
+                "response": "No song is currently playing."
+            }
+
+        # -------------------------------------------------
+        # 🔥 FIX: REMOVE FROM FAVORITES (CRITICAL FIX)
+        # -------------------------------------------------
+        if action == "remove_favorite":
+
+            target = self.last_active_platform
+            platform = self.platform_instances.get(target)
+
+            if not platform:
+                return {
+                    "status": "error",
+                    "response": "No active platform."
+                }
+
+            # 🔥 USE CURRENT SONG INSTEAD OF QUERY
+            if hasattr(platform, "current_song") and platform.current_song:
+                return platform.memory.remove_favorite(platform.current_song)
+
+            return {
+                "status": "error",
+                "response": "No song is currently playing."
+            }
+
+        # -------------------------------------------------
+        # 🔥 PLAY FAVORITES HANDLER (NEW)
+        # -------------------------------------------------
+        if action == "play_favorite":
+
+            target = structured.get("target")  # ✅ FIRST DEFINE
+
+            # 🔥 ASK USER FIRST
+            if not target and not self.last_active_platform:
+                self.pending_action = "play_favorite"
+                return {
+                    "status": "ask",
+                    "response": "Do you want Spotify or YouTube?"
+                }
+
+            # 🔥 FALLBACK
+            if not target:
+                target = self.last_active_platform
+
+            # 🔥 NOW VALIDATE (AFTER target EXISTS)
+            if target not in ["spotify", "youtube"]:
+                self.pending_action = "play_favorite"
+                return {
+                    "status": "ask",
+                    "response": "Do you want Spotify or YouTube?"
+                }
+
+            # ✅ START DRIVER HERE
+            self._ensure_driver()
+
+            if target not in self.tabs:
+                self._open_new_tab(target)
+            else:
+                self._switch_to_tab(target)
+
+            self.last_active_platform = target
+            platform = self.platform_instances[target]
+
+            return platform.play_favorite()
+
         # ✅ READ EMAIL HANDLER
         if action == "read_latest_email":
 
             # 🔥 ENSURE DRIVER FIRST
             self._ensure_driver()
 
-            gmail = self.platform_instances.get("gmail")
+            gmail = Gmail(self.driver)
 
             if not gmail:
                 return {
@@ -784,8 +990,20 @@ You can say:
                 "status": "error",
                 "response": "No action provided."
             }
+        # 🔥 FORCE TARGET FROM USER COMMAND (VERY IMPORTANT)
+        original_command = structured.get("original_command", "").lower()
 
+        # 🔥 ONLY FORCE TARGET FOR EXPLICIT COMMANDS
+        if action in ["play", "open", "search"]:
+            if "youtube" in original_command or "yt" in original_command:
+                structured["target"] = "youtube"
+
+            elif "spotify" in original_command:
+                structured["target"] = "spotify"
+
+        print("DEBUG last_active_platform:", self.last_active_platform)
         target = self._detect_target(structured)
+        structured["target"] = target
         # 🔥 FORCE GOOGLE TAB FOR SEARCH (CORRECT POSITION)
         if action == "search" and target == "google":
 
@@ -800,7 +1018,7 @@ You can say:
             return platform.search(query)
 
         # 🔥 FIX: sync structured with actual target
-        structured["target"] = target
+
 
         # CLOSE ENTIRE BROWSER
         if action == "close_browser":
@@ -885,7 +1103,7 @@ You can say:
                 try:
                     self._switch_to_tab(target)
 
-                    # 🔥 FIX: Prevent closing last tab
+                    # ❌ Don't close last tab
                     if len(self.driver.window_handles) == 1:
                         return {
                             "status": "info",
@@ -894,6 +1112,11 @@ You can say:
 
                     self.driver.close()
                     self.tabs.pop(target, None)
+
+                    # 🔥🔥 CRITICAL FIX: SWITCH TO SAFE TAB
+                    if self.driver.window_handles:
+                        self.driver.switch_to.window(self.driver.window_handles[0])
+                        bring_browser_to_front()
 
                     return {
                         "status": "success",
@@ -956,12 +1179,30 @@ You can say:
         if just_opened and action == "play":
             result = platform.play(query)
         else:
-            result = self._execute_platform_method(platform, action, query)
+            try:
+                result = self._execute_platform_method(platform, action, query)
+            except Exception:
+                print("⚠ Retrying after driver reset...")
+                self._ensure_driver()
+                result = self._execute_platform_method(platform, action, query)
 
         # 🔥 HANDLE SUCCESS + INFO (DO NOT FALLBACK)
-        if result.get("status") in ["success", "info"]:
-            self.last_active_platform = target
-            return result
+        # 🔥 HANDLE SUCCESS + INFO (FIX LAST ACTIVE PLATFORM LOGIC)
+        if result.get("status") == "success":
 
+            # 🔥 ALWAYS track platform for media actions
+            if action in ["play", "pause", "resume", "stop"]:
+                self.last_active_platform = target
+
+            # 🔥 ALSO track if response contains "Playing"
+            if "Playing" in result.get("response", ""):
+                self.last_active_platform = target
+            return result
+        # 🔥 HANDLE LOGIN REQUIRED
+        if result.get("status") == "login_required":
+            return {
+                "status": "info",
+                "response": "Please login to Spotify first. I’ll continue after that."
+            }
         # 🔥 ONLY fallback on real error
         return result

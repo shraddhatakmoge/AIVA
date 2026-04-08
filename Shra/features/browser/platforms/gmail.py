@@ -25,12 +25,14 @@ class Gmail:
         ]
 
         # 🔥 Get ROOT directory (AIVA-shra)
-        BASE_DIR = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "../../../../..")
-        )
+        # 🔥 Get directory of THIS FILE (portable)
+        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-        cred_path = os.path.join(BASE_DIR, "credentials.json")
-        token_path = os.path.join(BASE_DIR, "token.pickle")
+        # 🔥 Go up 3 levels → reach AIVA/Shra/
+        ROOT_DIR = os.path.abspath(os.path.join(BASE_DIR, "../../.."))
+
+        cred_path = os.path.join(ROOT_DIR, "credentials.json")
+        token_path = os.path.join(ROOT_DIR, "token.pickle")
 
         creds = None
 

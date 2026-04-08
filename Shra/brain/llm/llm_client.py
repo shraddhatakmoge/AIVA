@@ -16,49 +16,81 @@ class LLMClient:
                 "messages": [
                     {
                         "role": "system",
-                        "content": """You are an AI assistant that ONLY returns JSON.
+                        "content": """
+    You are a STRICT JSON command generator.
 
-STRICT RULES:
-- ALWAYS return valid JSON
-- ALWAYS include: action
-- DO NOT explain anything
-- DO NOT use markdown
-- DO NOT skip keys
+    ONLY return JSON. NOTHING ELSE.
 
-Example:
-{"action": "play", "target": "youtube", "query": "song name"}
-"""
+    Allowed actions:
+    open, close, search, play_music,
+    pause, resume, stop,
+    add_to_favorites, remove_favorite,
+    play_favorite, play_last, play_yesterday,
+    send_file, read_messages, send_email,
+    handle_mood
+
+    Rules:
+    - Output MUST be valid JSON
+    - NO explanations
+    - NO extra text
+    - NO markdown
+    - NO examples
+    - NO multiple languages
+
+    If emotion detected:
+    → action = "handle_mood"
+
+    If unclear:
+    → action = "search", target = "google", query = user input
+
+    Correct format:
+    {"action":"play_music","target":"youtube","query":"song"}
+    """
                     },
                     {
                         "role": "user",
                         "content": prompt
                     }
                 ],
-                "stream": False
+                "stream": False,
+                "options": {
+                    "temperature": 0  # 🔥 VERY IMPORTANT
+                }
             }
 
             response = requests.post(self.url, json=payload)
 
-            if response.status_code != 200:
-                raise Exception(f"Ollama error: {response.text}")
-
             data = response.json()
             content = data["message"]["content"]
 
-            # 🔥 CLEAN MARKDOWN
-            content = re.sub(r"```json|```", "", content).strip()
+            # 🔥 HARD CLEAN
+            content = re.sub(r"```.*?```", "", content, flags=re.DOTALL)
+            content = content.strip()
 
-            # 🔥 FIX SINGLE QUOTES (phi3 issue)
-            if content.startswith("{") and "'" in content:
-                content = content.replace("'", '"')
-
-            # 🔥 RETURN STRING (IMPORTANT — SAME AS GEMMA)
-            try:
-                return json.loads(content)
-            except:
-                print("JSON PARSE ERROR:", content)
+            # 🔥 EXTRACT ONLY FIRST JSON
+            match = re.search(r"\{.*?\}", content, re.DOTALL)
+            if not match:
+                print("LLM RAW:", content)
                 return {}
 
+            json_str = match.group()
+
+            # 🔥 FIX INVALID JSON (single quotes, bad format)
+            try:
+                return json.loads(json_str)
+            except:
+                try:
+                    fixed = json_str.replace("'", '"')
+                    return json.loads(fixed)
+                except:
+                    print("BROKEN JSON:", json_str)
+
+                    # 🔥 FINAL FALLBACK (VERY IMPORTANT)
+                    return {
+                        "action": "search",
+                        "target": "google",
+                        "query": prompt
+                    }
         except Exception as e:
-            print("FULL LLM ERROR:", str(e))
-            return ""
+            print("LLM ERROR:", str(e))
+            return {}

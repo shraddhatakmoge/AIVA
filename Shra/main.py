@@ -85,7 +85,67 @@ def process_command(command: str) -> dict:
                 "response": "Could not understand command."
             }
 
+
     # 🔥 ADD ORIGINAL COMMAND (future-safe)
+    # 🔥 TARGET + ACTION FINAL SANITIZATION (100% FIX)
+
+    # 🔥 FINAL INTENT CORRECTION (ONLY ONE CLEAN BLOCK)
+
+    valid_actions = [
+        "open", "close", "search", "play_music",
+        "pause", "resume", "stop",
+        "add_to_favorites", "remove_favorite",
+        "play_favorite", "play_last", "play_yesterday",
+        "send_file", "read_messages", "send_email",
+        "handle_mood", "close_browser",
+        "switch_back", "switch_to_google", "switch_to_app",
+        "read_latest_email", "scroll"
+    ]
+
+    valid_targets = [
+        "youtube", "spotify", "google", "gmail",
+        "whatsapp", "browser"
+    ]
+
+    lower = command.lower()
+
+    # 🔥 FORCE EMOTION FIRST (VERY IMPORTANT)
+    if any(word in lower for word in [
+        "sad", "terrible", "bad", "depressed",
+        "lonely", "upset", "not okay"
+    ]):
+        structured = {
+            "action": "handle_mood",
+            "target": "youtube",
+            "query": {"mood": "sad"}
+        }
+
+    # 🔥 FIX INVALID ACTION
+    elif structured.get("action") not in valid_actions:
+        structured = {
+            "action": "search",
+            "target": "google",
+            "query": command
+        }
+
+    # 🔥 FIX INVALID TARGET
+    if structured.get("target") not in valid_targets:
+
+        if "music" in lower or "song" in lower:
+            structured["target"] = "youtube"
+
+        elif "mail" in lower or "email" in lower:
+            structured["target"] = "gmail"
+
+        elif "whatsapp" in lower or "message" in lower:
+            structured["target"] = "whatsapp"
+
+        else:
+            structured["target"] = "google"
+
+
+
+    # 🔥 ADD ORIGINAL COMMAND AFTER FIX
     structured["original_command"] = command
 
     # 🔥 SAFE EXECUTION (no crashes in UI)

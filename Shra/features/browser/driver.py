@@ -1,7 +1,7 @@
+import time
+
 import undetected_chromedriver as uc
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
 import os
 
 
@@ -24,8 +24,10 @@ class DriverManager:
 
         if self.driver:
             try:
-                _ = self.driver.current_url
+                # 🔥 SIMPLE CHECK ONLY (DON’T OVERCHECK)
+                _ = self.driver.title
                 return self.driver
+
             except Exception:
                 print("⚠ Driver session invalid. Restarting Chrome...")
                 self._safe_quit()
@@ -42,7 +44,7 @@ class DriverManager:
         chrome_options = Options()
 
         # 🔥 ADD THIS LINE
-        chrome_options.page_load_strategy = "normal"
+        chrome_options.page_load_strategy = "none"
         chrome_options.add_argument("--start-maximized")
 
         # -------------------------------------------------
@@ -58,9 +60,11 @@ class DriverManager:
         # -------------------------------------------------
         # 🔥 Persistent Chrome Profile (Login stays saved)
         # -------------------------------------------------
-        profile_path = r"C:\Users\Aniket\AIVA_chrome_profile"   # ✅ CHANGED
-        os.makedirs(profile_path, exist_ok=True)                # ✅ NEW
-        chrome_options.add_argument(f"--user-data-dir={profile_path}")  # ✅ CHANGED
+        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+        profile_path = os.path.join(BASE_DIR, "chrome_profile")
+
+        os.makedirs(profile_path, exist_ok=True)
+        chrome_options.add_argument(f"--user-data-dir={profile_path}")
 
         # -------------------------------------------------
         # Remove Automation Detection Flags
@@ -71,11 +75,9 @@ class DriverManager:
             "--disable-features=PreloadMediaEngagementData,MediaEngagementBypassAutoplayPolicies")
         chrome_options.add_argument("--use-fake-ui-for-media-stream")
 
-        # 🔥 GPU FIX (CRITICAL)
-        chrome_options.add_argument("--enable-gpu")
-        chrome_options.add_argument("--ignore-gpu-blocklist")
-        chrome_options.add_argument("--enable-webgl")
-        chrome_options.add_argument("--enable-accelerated-video-decode")
+        chrome_options.add_argument("--disable-renderer-backgrounding")
+        chrome_options.add_argument("--disable-background-timer-throttling")
+        chrome_options.add_argument("--disable-backgrounding-occluded-windows")
 
         # 🔥 SANDBOX FIX
         chrome_options.add_argument("--no-sandbox")
@@ -85,11 +87,10 @@ class DriverManager:
         # Start Driver
         # -------------------------------------------------
         try:
-            self.driver = uc.Chrome(
-                options=chrome_options,
-                version_main=146  # 🔥 MATCH YOUR CHROME VERSION
-            )
-
+            self.driver = uc.Chrome(options=chrome_options)
+            self.driver.get("about:blank")  # 🔥 ensures clean base tab
+            self.driver.set_page_load_timeout(8)
+            time.sleep(2)
         except Exception as e:
             print("❌ Failed to start Chrome:", e)
             raise

@@ -413,7 +413,7 @@ class YouTube:
         if not song:
             return {
                 "status": "error",
-                "response": "No favorites saved."
+                "response": "No favorite songs found."
             }
 
         return self.play(song)

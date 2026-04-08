@@ -11,7 +11,7 @@ def bring_browser_to_front():
     def enum_handler(hwnd, _):
         if win32gui.IsWindowVisible(hwnd):
             title = win32gui.GetWindowText(hwnd)
-            if "Chrome" in title:
+            if any(x in title.lower() for x in ["chrome", "google chrome"]):
                 try:
                     # Restore if minimized
                     win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)

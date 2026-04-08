@@ -56,7 +56,7 @@ class Google:
             "response": "Result not found"
         }
 
-    def open(self):
+    def open(self, tab_handle=None):
         self.driver.get(self.get_url())
         bring_browser_to_front()
 
@@ -149,8 +149,9 @@ class Google:
     # -------------------------------------------------
     # SEARCH  ✅ NEW
     # -------------------------------------------------
-    def search(self, query):
-
+    def search(self, query, tab_handle=None):
+        if tab_handle:
+            self.driver.switch_to.window(tab_handle)
         if not query:
             return {
                 "status": "error",
