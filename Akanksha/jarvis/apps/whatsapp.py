@@ -12,11 +12,13 @@ pyautogui.FAILSAFE = False
 
 last_message = ""
 engine = pyttsx3.init()
+STOP_RECORDING = False  #
 
 def speak(text):
     print("🔊", text)
     engine.say(text)
     engine.runAndWait()
+
 
 
 # -------- OPEN --------
@@ -121,8 +123,13 @@ def send_screenshot(contact):
     focus_whatsapp()
     time.sleep(1)
 
-    # 🔥 Step 1: Set your screenshot folder
-    folder = r"C:\Users\Akanksha\OneDrive\Pictures\Screenshots"   # 🔧 CHANGE if needed
+    # 🔥 DYNAMIC PATH FIX: Automatically finds the Screenshots folder for ANY user
+    user_profile = os.path.expanduser('~')
+    onedrive_path = os.path.join(user_profile, "OneDrive", "Pictures", "Screenshots")
+    local_path = os.path.join(user_profile, "Pictures", "Screenshots")
+    
+    # Check if their laptop uses OneDrive or Local storage
+    folder = onedrive_path if os.path.exists(onedrive_path) else local_path
 
     path = get_latest_screenshot(folder)
 
@@ -193,11 +200,6 @@ def voice_call(contact):
     pyautogui.press("enter")
     time.sleep(2)
 
-
-    pyautogui.press("esc")
-    time.sleep(0.5)
-
-    # Navigate to call
     for _ in range(9):
         pyautogui.press("tab")
         time.sleep(0.2)
@@ -210,12 +212,9 @@ def voice_call(contact):
 
     pyautogui.press("enter")
     
-    pyautogui.moveTo(984, 600)  # 👈 replace with your coords
-    time.sleep(0.5)
-    pyautogui.click()
 
-    print("📞 Voice calling", contact)
 
+    print("🎥 Video calling", contact)
 
 # ------ VIDEO CALL -------    
 def video_call(contact):
@@ -256,19 +255,25 @@ def video_call(contact):
 
     pyautogui.press("enter")
     
-    pyautogui.moveTo(984, 600)  # 👈 replace with your coords
-    time.sleep(0.5)
-    pyautogui.click()
-
     print("🎥 Video calling", contact)
     
 # ----- MUTE/UNMUTE CALL ------------   
 def mute_call():
+    print("🔇 Muting system microphone...")
+    time.sleep(1)
+
     pyautogui.hotkey("win", "alt", "k")
 
+    print("✅ Mic muted")
+
+
 def unmute_call():
+    print("🔊 Unmuting system microphone...")
+    time.sleep(1)
+
     pyautogui.hotkey("win", "alt", "k")
-    
+
+    print("✅ Mic unmuted")
         
 # ---------- CHECK STATUS ---------      
 def open_status_by_click(contact):
@@ -296,22 +301,20 @@ def open_status_by_click(contact):
     time.sleep(2)
 
     # 🔥 Step 5: CLICK YOUR COORDINATES
-    pyautogui.moveTo(165, 412)  # 👈 replace with your coords
+    pyautogui.moveTo(157, 445)  # 👈 replace with your coords
     time.sleep(0.5)
     pyautogui.click()
 
     print("👁️ Status opened")
     
+
 # -------- VOICE MESSAGE -----------
 def send_voice_message(contact):
-    thread = threading.Thread(target=_record_voice, args=(contact,))
-    thread.start()
-
+    open_whatsapp()
+    # No need for threads anymore! It runs, locks the mic, and finishes.
+    _record_voice(contact)
 
 def _record_voice(contact):
-    global STOP_RECORDING
-    STOP_RECORDING = False
-
     focus_whatsapp()
     time.sleep(1)
 
@@ -331,45 +334,34 @@ def _record_voice(contact):
     pyautogui.press("enter")
     time.sleep(2)
 
-    print("➡️ Chat opened")
+    print(f"➡️ Chat opened for {contact}")
 
+    # 🎤 Move to Mic
     pyautogui.moveTo(1848, 955)
     time.sleep(0.5)
 
-    # 🎤 Start recording
+    # 🔥 THE FIX: Swipe UP to lock the mic
     pyautogui.mouseDown()
-    print("🎙️ Recording...")
+    time.sleep(0.5)
+    pyautogui.moveRel(0, -100, duration=0.5) # Drags the mouse up 100 pixels
+    pyautogui.mouseUp()                      # Releases the mouse. Mic is now locked!
 
-    # 🔥 Wait until STOP command comes
-    while not STOP_RECORDING:
-        time.sleep(0.2)
+    print("🎙️ Recording Locked... (Type 'stop recording' when ready to send)")
 
-    # 🛑 Stop recording
-    pyautogui.mouseUp()
-
-    print("✅ Voice message sent")
     
 def stop_voice_message():
-    global STOP_RECORDING
-
-    # 🔥 Set flag to stop loop
-    STOP_RECORDING = True
-
-    time.sleep(0.5)
-
     # 🔥 Bring WhatsApp to front
     focus_whatsapp()
     time.sleep(1)
 
-    # 🎯 Move to your mic/send button
-    pyautogui.moveTo(1848, 955)  # your coordinates
+    # 🎯 Move back to the exact same coordinates (which is now the SEND button)
+    pyautogui.moveTo(1848, 955)  
     time.sleep(0.3)
 
-    # 🔥 Click to ensure send
+    # 🔥 Click to send
     pyautogui.click()
 
     print("✅ Voice message sent")
-    
     
 # -------- SEND ATTACHMENT (DOCUMENT/FILE) --------
 def send_attachment(contact, file_path):

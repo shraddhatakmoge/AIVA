@@ -1,13 +1,13 @@
 from apps.notepad import *
 from apps.calculator import *
-from apps.vscode import open_vscode, close_vscode
-from apps.word import open_word, close_word, new_document, write_in_word, save_word_file, apply_style, set_alignment, apply_heading
-from apps.powerpoint import open_powerpoint, close_powerpoint
+from apps.word import *
+from apps.powerpoint import *
 from apps.spotify import *
 from apps.whatsapp import *
 from common import find_document, resolve_contact
 from nlp import process_nlp
 from services.file_service import handle_file_command
+# from llm_brain import ask_jarvis_llm
 
 import pygetwindow as gw
 import time
@@ -27,11 +27,12 @@ def get_active_app():
         win = gw.getActiveWindow()
         if win and win.title:
             title = win.title.lower()
-            # Checks if "notepad" exists anywhere in the title
             if "notepad" in title:
                 return "notepad"
             elif "whatsapp" in title:
                 return "whatsapp"
+            elif "word" in title:  # 🔥 NEW: Teach it to see Word!
+                return "word"
     except Exception as e:
         print(f"⚠️ Window detection error: {e}")
     return None
@@ -47,8 +48,11 @@ def execute_action(data, original_command=""):
     action = data.get("action")
     text = data.get("text")
     line = data.get("line")
+    style=data.get("style") 
+    color=data.get("color")     
     direction = data.get("direction")
     contact = data.get("contact")
+    size = data.get("size")
 
     # ==============================
     # 📂 FILE SYSTEM (NEW)
@@ -112,6 +116,7 @@ def execute_action(data, original_command=""):
             if line:
                 delete_word_from_line(text, line)
             else:
+                # 🔥 Make sure this matches the function name in notepad.py
                 delete_word(text)
 
         elif action == "read":
@@ -200,6 +205,8 @@ def execute_action(data, original_command=""):
 
         elif action == "voice_note":
             send_voice_message(contact)
+        elif action == "stop_voice":
+            stop_voice_message()
 
         # In main(brain).py under the WhatsApp section:
         elif action == "send_attachment":
@@ -252,21 +259,24 @@ def execute_action(data, original_command=""):
           
 
     # ==============================
-    # 💻 VS CODE
-    # ==============================
-    elif app == "vscode":
-        if action == "open":
-            open_vscode()
-        elif action == "close":
-            close_vscode()
-        return True
-
-    # ==============================
     # 📄 WORD
     # ==============================
     elif app == "word":
         if action == "open":
             open_word()
+        elif action == "open_file":
+            file_name = data.get("text")
+            location = data.get("folder")
+            
+            print(f"🔍 JARVIS: Searching for '{file_name}'...")
+            # Use your smart search tool from common.py!
+            real_file_path = find_document(file_name, specific_location=location)
+            
+            if real_file_path:
+                open_existing_word_file(real_file_path)
+            else:
+                print(f"❌ JARVIS: Could not find a file named '{file_name}'.")
+
         elif action == "close":
             close_word()
         elif action == "new":           
@@ -282,18 +292,91 @@ def execute_action(data, original_command=""):
             set_alignment(data.get("align"))
         elif action == "heading":
             apply_heading(data.get("level"))
+        elif action == "style_specific":
+            target = data.get("text")
+            style = data.get("style")
+            color = data.get("color")
+            size = data.get("size")
+            
+            # Now passing all 4 pieces of data!
+            style_specific_text(target, style, color, size)
+            
+        # --- ADVANCED NOTEPAD FEATURES PORTED TO WORD ---
+        elif action == "read":
+            read_word()
+    
+        elif action == "replace":
+            old_word = data.get("old_text")
+            new_word = data.get("new_text")
+            if old_word and new_word:
+                word_replace_word(old_word, new_word)
+                
+        elif action == "delete":
+            word_delete_word(data.get("text"))
+            
+        elif action == "clear":
+            word_clear()
+            
+        elif action == "insert":
+            if line:
+                word_insert_text_at_line(text, line)
+            else:
+                word_insert_at_cursor(text)
+                
+        elif action == "space":
+            word_space()
+            
+        elif action == "new_line":
+            word_new_line()
+            
+        elif action == "new_paragraph":
+            word_new_paragraph()
+            
+        elif action == "move":
+            word_move_cursor(direction)
+            
         return True
 
     # ==============================
-    # 📊 POWERPOINT
+    # 📄 POWERPOINT
     # ==============================
+    # Inside execute_action function:
     elif app == "powerpoint":
         if action == "open":
             open_powerpoint()
+        elif action == "add_slide":
+            add_slide()
+        elif action == "start_slideshow": # 🔥 NEW CONNECTION
+            start_slideshow()
+        elif action == "delete_slide":
+            # 🔥 Pass the slide number (text) to the function
+            delete_slide(data.get("text"))
+            
+        elif action == "apply_theme":
+            apply_presentation_theme(text)
+        elif action == "stop_slideshow":
+            stop_slideshow()    
+        elif action == "navigate":
+            # 🔥 FIX: You must actually call the function here!
+            target = data.get("text")
+            if target:
+                navigate_slide(target)
+        elif action == "set_title":
+            # 🎯 Make sure we use data.get("text")
+            msg = data.get("text") 
+            if msg:
+                set_slide_title(msg)
+            else:
+                print("⚠️ JARVIS: Found 'title' command but text was empty.")
+        elif action == "set_subtitle": # 🔥 NEW CONNECTION
+            set_slide_subtitle(data.get("text"))
+        elif action == "set_content": # 🔥 NEW CONNECTION
+            set_slide_content(data.get("text"))
+        
         elif action == "close":
             close_powerpoint()
         return True
-
+    
     # ==============================
     # 🎵 SPOTIFY
     # ==============================
@@ -384,31 +467,48 @@ def is_nlp_confident(data):
 # ==============================
 import re
 
+# 🔥 JARVIS'S MEMORY STATE
+CURRENT_APP_STATE = "notepad" 
+
 def process_command(command):
+    global CURRENT_APP_STATE
+    
     # Standardize input
     command = command.lower().strip()
 
-    # Split the sentence into multiple parts
-    parts = re.split(r'\b(?:and then|then|and)\b', command)
+    parts = re.split(r'\b(?:and then|then)\b', command)
     
     for part in parts:
         part = part.strip().strip(',').strip('.') 
         if not part: continue
         
-        print(f"🤖 JARVIS processing: {part}")
-        nlp_data = process_nlp(part) 
         
-        # Contextual Check
-        if nlp_data.get("app") is None:
-            active = get_active_app()
-            if active == "notepad":
-                nlp_data["app"] = "notepad"
+        # 1. 👁️ LOOK AT THE SCREEN: Is the user physically looking at Word or Notepad?
+        on_screen = get_active_app()
+        if on_screen:
+            CURRENT_APP_STATE = on_screen
+            
+        # 2. 🧠 PASS THE MEMORY TO NLP
+        # This tells the brain: "Hey, we are currently focused on [Word]!"
+        nlp_data = process_nlp(part, CURRENT_APP_STATE) 
+        
+        print("📊 NLP RESULT:", nlp_data)   
+        
+        # 3. 💾 UPDATE MEMORY IF APP CHANGED
+        # If the user explicitly said "open notepad", update the memory!
+        if nlp_data.get("app"):
+            CURRENT_APP_STATE = nlp_data["app"]
 
         # Validate and Execute
+        # Validate and Execute
         if is_nlp_confident(nlp_data):
+            # If it's a specific app command (WhatsApp, PowerPoint, etc.)
             execute_action(nlp_data, part)
-            # 🔥 INCREASE DELAY to 0.5 to stop the 'smushing'
             time.sleep(0.5)
+        # else:
+        #     # 🔥 THE TRUE AI UPGRADE 🔥
+        #     # If the NLP doesn't recognize the command, route it to Gemini!
+        #     ask_jarvis_llm(part)
             
 # ==============================
 # ▶️ RUN

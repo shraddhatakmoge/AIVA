@@ -1,45 +1,20 @@
 import re
 import os
 
-def process_nlp(command):
-    # 1. Keep a version with CAPITALS for writing/saving
+
+# 🔥 Notice we added 'current_app' to the function arguments
+def process_nlp(command, current_app="notepad"):
     raw_text_command = command.strip() 
-    
-    # 2. Keep a lowercase version for the IF/ELSE logic
     cmd = command.lower().strip()
 
     # --- Brain Polish (Filler removal) ---
     fillers = ["please", "jarvis", "can you", "could you", "i want to", "just", "kindly", "hey"]
-    
-    # Use \b (word boundaries) so 'jarvis' in a sentence isn't deleted
     for word in fillers:
-        # This replaces the word only if it's not attached to other letters
         cmd = re.sub(rf'\b{word}\b', '', cmd)
-        
-        # Also fix the raw text command for writing
         raw_text_command = re.sub(rf'\b{word}\b', '', raw_text_command, flags=re.IGNORECASE)
 
-    # Clean up extra spaces
     cmd = re.sub(' +', ' ', cmd).strip()
     raw_text_command = re.sub(' +', ' ', raw_text_command).strip()
-
-
-    # =========================================
-    # 📝 UPDATED NOTEPAD LOGIC
-    # =========================================
-    
-    # For WRITE/TYPE, use raw_text_command to preserve capitals
-    if "write" in cmd or "type" in cmd:
-        # Remove the word 'write' or 'type' but keep the rest of the casing
-        text_to_write = re.sub(r'^(write|type)\s+', '', raw_text_command, flags=re.IGNORECASE)
-        return {"app": "notepad", "action": "write", "text": text_to_write}
-
-    # For SAVE, use raw_text_command (In case they want a Capitalized filename)
-    match_save = re.search(r"save (?:as|file|file called|it as) (.*)", raw_text_command, re.IGNORECASE)
-    if match_save:
-        return {"app": "notepad", "action": "save", "text": match_save.group(1).strip()}
-
-    # ... (rest of your regex matches using 'cmd' for logic) ...
 
     result = {
         "app": None,
@@ -47,9 +22,387 @@ def process_nlp(command):
         "text": None,
         "line": None,
         "direction": None,
-        "contact": None
+        "contact": None,
+        "folder": None,
+        "level": None,
+        "style": None,
+        "align": None
     }
+
+    # =========================================
+    # 🧠 STEP 1: EXPLICIT APP DETECTION
+    # =========================================
     
+
+    if any(x in cmd for x in ["powerpoint", "presentation","ppt", "slide", "title", "content"]):
+        result["app"] = "powerpoint"
+    elif "word" in cmd or "ms word" in cmd:
+        result["app"] = "word"
+    elif "spotify" in cmd or "music" in cmd or "song" in cmd:
+        result["app"] = "spotify"
+    elif "calculator" in cmd or "calculate" in cmd or "+" in cmd or "-" in cmd or "*" in cmd or "/" in cmd:
+        result["app"] = "calculator"
+    elif "whatsapp" in cmd or "message" in cmd or "call" in cmd:
+        result["app"] = "whatsapp"
+    elif "folder" in cmd or "find file" in cmd or "search for" in cmd:
+        result["app"] = "file_system"
+    elif "notepad" in cmd:
+         result["app"] = "notepad"
+    else:
+        # 🔥 THE MAGIC TRICK: If they didn't specify an app, use the Memory!
+        result["app"] = current_app
+
+    # =========================================
+    # 📊 POWERPOINT LOGIC (Lines 72-130)
+    # =========================================
+    powerpoint_keywords = ["powerpoint", "presentation", "slide", "title", "content", "subtitle", "next", "previous", "go to", "show", "slideshow", "present", "theme", "design"]
+    
+    if any(x in cmd for x in powerpoint_keywords):
+        result["app"] = "powerpoint"
+        
+        if "open" in cmd: 
+            result["action"] = "open"
+        elif "close" in cmd: 
+            result["action"] = "close"
+        elif "add slide" in cmd or "new slide" in cmd: 
+            result["action"] = "add_slide"
+        elif "subtitle" in cmd:
+            result["action"] = "set_subtitle"
+            result["text"] = re.sub(r'(?i).*subtitle\s+(?:to\s+)?', '', raw_text_command).strip()
+        elif "title" in cmd:
+            result["action"] = "set_title"
+            result["text"] = re.sub(r'(?i).*title\s+(?:to\s+)?', '', raw_text_command).strip()
+        elif "content" in cmd:
+            result["action"] = "set_content"
+            result["text"] = re.sub(r'(?i).*content\s+(?:to\s+)?', '', raw_text_command).strip()
+        elif "delete" in cmd or "remove" in cmd:
+            result["action"] = "delete_slide"
+            match = re.search(r"slide\s+(\d+)", cmd)
+            result["text"] = match.group(1) if match else None
+        elif any(x in cmd for x in ["slideshow", "present", "start show"]):
+            result["action"] = "start_slideshow"
+        # --- 📊 SLIDESHOW NAVIGATION ---
+        elif any(x in cmd for x in ["next", "forward", "after"]):
+            result["action"] = "navigate"
+            result["text"] = "next"
+            return result
+
+        elif any(x in cmd for x in ["previous", "back", "before"]):
+            result["action"] = "navigate"
+            result["text"] = "previous"
+            return result
+
+        elif any(x in cmd for x in ["stop", "exit", "end"]) and "slideshow" in cmd:
+            result["action"] = "stop_slideshow"
+            return result
+        
+        elif any(x in cmd for x in ["go to", "next", "previous", "show"]):
+            result["action"] = "navigate"
+            if "next" in cmd: result["text"] = "next"
+            elif "previous" in cmd or "back" in cmd: result["text"] = "previous"
+            else:
+                match = re.search(r"slide\s+(\d+)", cmd)
+                result["text"] = match.group(1) if match else None
+        elif "theme" in cmd or "design" in cmd:
+            result["action"] = "apply_theme"
+            theme = re.sub(r'(?i).*theme\s+|.*design\s+', '', raw_text_command).strip()
+            result["text"] = theme if theme else "Office Theme"
+        
+        # 🔥 CRITICAL: Stop here so it doesn't fall into Notepad logic!
+        return result
+            
+        
+        
+    # -----------------------------------------
+    # 📝 NOTEPAD LOGIC (The Final Fallback)
+    # -----------------------------------------
+    
+    # 1. Check for explicit Notepad commands
+    if "notepad" in cmd:
+        result["app"] = "notepad"
+
+    # 2. Writing Logic (Preserve Casing)
+    if "write" in cmd or "type" in cmd:
+        text_to_write = re.sub(r'^(write|type|add)\s+', '', raw_text_command, flags=re.IGNORECASE).strip()
+        return {"app": result["app"] or "notepad", "action": "write", "text": text_to_write}
+
+    # 3. Simple Add/Insert Fallback
+    if "add" in cmd or "insert" in cmd:
+        # If we didn't return PowerPoint above, this will now default to Notepad
+        text = cmd.replace("insert", "").replace("add", "").strip()
+        return {"app": "notepad", "action": "insert", "text": text}
+
+    # 4. Final safety catch-all
+    if result["app"] is None:
+        result["app"] = "notepad"
+
+    
+
+   # -----------------------------------------
+    # 📄 MS WORD LOGIC (Optimized & Smart)
+    # -----------------------------------------
+    if result["app"] == "word":
+        
+        # 1. File & App Management
+        if "open file" in cmd or "open document" in cmd:
+            result["action"] = "open_file"
+            for loc in ["desktop", "documents", "downloads"]:
+                if loc in cmd: result["folder"] = loc
+            
+            clean_cmd = re.sub(r'open (file|document)|in word|from \w+|on \w+', '', cmd).strip()
+            result["text"] = clean_cmd
+
+        elif "open" in cmd and "file" not in cmd: result["action"] = "open"
+        elif "close" in cmd: result["action"] = "close"
+        elif "new document" in cmd or "new file" in cmd: result["action"] = "new"
+            
+        # 2. Writing (Preserves Casing)
+        elif "write" in cmd or "type" in cmd:
+            result["action"] = "write"
+            text = re.sub(r'^(write|type)\s+', '', raw_text_command, flags=re.IGNORECASE)
+            result["text"] = re.sub(r'(?i)\s+in word$', '', text).strip()
+            
+        # 3. Saving & Formatting
+        elif "save" in cmd:
+            result["action"] = "save"
+            if "desktop" in cmd:
+                path = os.path.expanduser("~\\OneDrive\\Desktop")
+                result["folder"] = path if os.path.exists(path) else os.path.expanduser("~\\Desktop")
+            elif "documents" in cmd:
+                path = os.path.expanduser("~\\OneDrive\\Documents")
+                result["folder"] = path if os.path.exists(path) else os.path.expanduser("~\\Documents")
+            
+            match = re.search(r"save (?:it |file )?(?:as|called|with name)? (.*?)(?: in| to| on|$)", cmd)
+            result["text"] = (match.group(1).strip() if match else "Document") + ".docx"
+                
+        elif "heading" in cmd:
+            result["action"] = "heading"
+            match = re.search(r"heading (\d)", cmd)
+            result["level"] = int(match.group(1)) if match else 1
+
+        # 4. Multi-Intent Styling (Color, Size, Bold)
+        elif any(x in cmd for x in ["make word", "make the word", "style word"]):
+            result["action"] = "style_specific"
+            parts = re.split(r'\b(bold|italic|underline|red|blue|green|yellow|black|size)\b', cmd)
+            if len(parts) > 1:
+                result["text"] = re.sub(r".*make (?:the )?words?\s+", "", parts[0]).strip()
+                if "bold" in cmd: result["style"] = "bold"
+                if "italic" in cmd: result["style"] = "italic"
+                colors = ["red", "blue", "green", "yellow", "black", "purple"]
+                for c in colors:
+                    if c in cmd: result["color"] = c; break
+                size_match = re.search(r"size (\d+)", cmd)
+                if size_match: result["size"] = int(size_match.group(1))
+                
+        # --- 🎨 SMART STYLING & SIZE ---
+        # 🔥 SMART COMBINED STYLING
+        elif "make" in cmd and ("word" in cmd or "text" in cmd):
+            result["action"] = "style_specific"
+            
+            # 1. Capture the target word (the word after 'word' or 'text')
+            target_match = re.search(r"(?:word|text)\s+([\w'-]+)", cmd)
+            if target_match:
+                result["text"] = target_match.group(1).strip()
+            
+            # 2. Extract Color
+            colors = ["red", "blue", "green", "yellow", "black", "purple", "orange"]
+            for c in colors:
+                if c in cmd:
+                    result["color"] = c
+                    break
+            
+            # 3. Extract Size
+            size_match = re.search(r"size\s+(\d+)", cmd)
+            if size_match:
+                result["size"] = int(size_match.group(1))
+            
+            # 4. Extract Basic Styles
+            if "bold" in cmd: result["style"] = "bold"
+            if "italic" in cmd: result["style"] = "italic"
+            if "underline" in cmd: result["style"] = "underline"
+            
+          
+
+        # 5. Core Editing (Shared with Notepad)
+        elif "replace" in cmd or "change" in cmd:
+            match = re.search(r"(?:replace|change) (.*?) (?:with|to) (.*)", cmd)
+            if match:
+                result["action"] = "replace"
+                result["old_text"] = match.group(1).strip()
+                result["new_text"] = match.group(2).strip()
+
+        elif "delete word" in cmd:
+            result["action"] = "delete"
+            result["text"] = cmd.split("delete word")[-1].strip()
+
+        elif "insert" in cmd or "add" in cmd:
+            match = re.search(r"(?:insert|add) (.*?) (?:at|on|in) line (\d+)", cmd)
+            if match:
+                result["action"] = "insert"; result["text"] = match.group(1).strip(); result["line"] = int(match.group(2))
+            else:
+                result["action"] = "insert"; result["text"] = cmd.replace("insert", "").replace("add", "").strip()
+
+        # 6. Navigation & Visuals
+        elif "align" in cmd or "center" in cmd:
+            result["action"] = "alignment"
+            for a in ["center", "right", "left", "justify"]:
+                if a in cmd: result["align"] = a; break
+
+        elif "clear" in cmd or "empty" in cmd: result["action"] = "clear"
+        elif "read" in cmd: result["action"] = "read"
+        elif "undo" in cmd: result["action"] = "style"; result["style"] = "undo"
+        elif "new line" in cmd: result["action"] = "new_line"
+        elif "paragraph" in cmd: result["action"] = "new_paragraph"
+        elif "move" in cmd:
+            for d in ["left", "right", "up", "down"]:
+                if d in cmd: result["action"] = "move"; result["direction"] = d; break
+
+        return result # 🔥 This stops the brain from falling into Notepad logic!
+    # =========================================
+    # 📝 UPDATED NOTEPAD LOGIC
+    # =========================================
+    # For WRITE/TYPE, use raw_text_command to preserve capitals
+    if ("write" in cmd or "type" in cmd):
+        # Remove the word 'write' or 'type' but keep the rest of the casing
+        text_to_write = re.sub(r'^(write|type|add)\s+', '', raw_text_command, flags=re.IGNORECASE).strip()
+        
+        # 🔥 THE FIX: Use result["app"] so it respects your Context Memory!
+        return {"app": result["app"], "action": "write", "text": text_to_write}
+
+    # For SAVE, use raw_text_command (In case they want a Capitalized filename)
+    match_save = re.search(r"save (?:as|file|file called|it as) (.*)", raw_text_command, re.IGNORECASE)
+    if match_save:
+        # 🔥 THE FIX: Use result["app"] here too!
+        return {"app": result["app"], "action": "save", "text": match_save.group(1).strip()}
+
+
+    # =========================================
+    # 📝 NOTEPAD SECTION
+    # =========================================
+    
+    # =========================================
+    # 📝 FULL SMART NOTEPAD NLP (16 FEATURES)
+    # =========================================
+
+    # 1 & 2. OPEN / CLOSE
+    if "open notepad" in cmd:
+        return {"app": "notepad", "action": "open"}
+    elif "close notepad" in cmd:
+        return {"app": "notepad", "action": "close"}
+
+    # 4. SMART SAVE (Handles: "save as report", "save file test")
+    # 💾 SMART SAVE (High Priority)
+    # This must come BEFORE any simple "if 'save' in cmd" check
+    match_save = re.search(r"save (?:it |file )?(?:as|called|with name)? (.*)", raw_text_command, re.IGNORECASE)
+    
+    if match_save:
+        filename = match_save.group(1).strip()
+        # Clean up any leftover punctuation from the sentence split
+        filename = filename.replace(".", "").replace(",", "").strip()
+        if not filename.endswith(".txt"): 
+            filename += ".txt"
+        return {"app": "notepad", "action": "save", "text": filename}
+
+    # Fallback only if no filename is provided
+    elif "save" in cmd:
+        return {"app": "notepad", "action": "save", "text": "test.txt"}
+
+    # 11. DELETE WORD FROM LINE (Priority Check)
+    match_del_line = re.search(r"delete word (.*?) from line (\d+)", cmd)
+    if match_del_line:
+        return {"app": "notepad", "action": "delete", "text": match_del_line.group(1).strip(), "line": int(match_del_line.group(2))}
+
+    # 5 & 9. DELETE LINE / DELETE WORD
+    elif "delete" in cmd:
+        # 1. Handle "delete line" first
+        if "line" in cmd:
+            return {"app": "notepad", "action": "delete_line"}
+            
+        # 2. Handle "delete word hello" or "delete hello"
+        # We remove 'delete' and 'word' to isolate the target
+        target = cmd.replace("delete", "").replace("word", "").strip()
+        
+        return {"app": "notepad", "action": "delete", "text": target}
+
+    # 14. INSERT TEXT AT LINE
+    match_ins_line = re.search(r"(?:insert|add|put) (.*?) (?:at|on|in) line (\d+)", cmd)
+    if match_ins_line:
+        return {"app": "notepad", "action": "insert", "text": match_ins_line.group(1).strip(), "line": int(match_ins_line.group(2))}
+
+    # 8. REPLACE WORD
+    match_replace = re.search(r"(?:replace|change) (.*?) (?:with|to) (.*)", cmd)
+    if match_replace:
+        return {"app": "notepad", "action": "replace", "old_text": match_replace.group(1).strip(), "new_text": match_replace.group(2).strip()}
+
+    # 10. UNDO / REDO
+    if "undo" in cmd:
+        return {"app": "notepad", "action": "undo"}
+    elif "redo" in cmd:
+        return {"app": "notepad", "action": "redo"}
+
+    # 12. NEW LINE / PARAGRAPH
+    if "new paragraph" in cmd:
+        return {"app": "notepad", "action": "new_paragraph"}
+    elif "new line" in cmd:
+        return {"app": "notepad", "action": "new_line"}
+
+    # 13. CURSOR MOVEMENT
+    if "move" in cmd:
+        for direction in ["left", "right", "up", "down"]:
+            if direction in cmd:
+                return {"app": "notepad", "action": "move", "direction": direction}
+
+    # 16. SPACE (Added)
+    elif cmd == "space" or "add space" in cmd:
+        return {"app": "notepad", "action": "space"}
+
+    # 15. INSERT AT CURSOR (Generic Add/Insert)
+    if "insert" in cmd or "add" in cmd:
+        text = cmd.replace("insert", "").replace("add", "").strip()
+        return {"app": "notepad", "action": "insert", "text": text}
+
+    # 3. WRITE / TYPE
+    # Inside your nlp.py Notepad section
+    if "write" in cmd or "type" in cmd:
+        # Use a regex that ONLY removes the trigger word at the start
+        text_to_write = re.sub(r'^(write|type|add)\s+', '', raw_text_command, flags=re.IGNORECASE).strip()
+        return {"app": "notepad", "action": "write", "text": text_to_write}
+
+    # 5. CLEAR / 6. NEW FILE / 7. READ
+    if "clear" in cmd or "empty" in cmd:
+        return {"app": "notepad", "action": "clear"}
+    elif "new file" in cmd or "create file" in cmd:
+        return {"app": "notepad", "action": "new"}
+    elif "read" in cmd:
+        return {"app": "notepad", "action": "read"}
+    
+    # =========================================
+    # 📝 NATURAL LANGUAGE NOTEPAD
+    # =========================================
+
+    # ✍️ WRITE (Natural: "say hello", "tell him i am coming", "type something")
+    match_write = re.search(r"(?:write|type|say|tell him|tell her) (.*)", cmd)
+    if match_write and "line" not in cmd and "save" not in cmd:
+        return {"app": "notepad", "action": "write", "text": match_write.group(1).strip()}
+
+    # 💾 SAVE (Natural: "save it", "save as notes", "call the file x")
+    match_save = re.search(r"save (?:it |file )?(?:as|called|with name)? (.*)", cmd)
+    if match_save:
+        filename = match_save.group(1).strip()
+        if not filename.endswith(".txt"): filename += ".txt"
+        return {"app": "notepad", "action": "save", "text": filename}
+
+    # 🔄 REPLACE (Natural: "swap x for y", "turn x into y")
+    match_swap = re.search(r"(?:swap|turn|change) (.*?) (?:for|into|to) (.*)", cmd)
+    if match_swap:
+        return {"app": "notepad", "action": "replace", "old_text": match_swap.group(1).strip(), "new_text": match_swap.group(2).strip()}
+
+    # ➕ INSERT (Natural: "put x on line y", "squeeze x into line y")
+    match_put = re.search(r"(?:put|squeeze|insert|add) (.*?) (?:on|at|into) line (\d+)", cmd)
+    if match_put:
+        return {"app": "notepad", "action": "insert", "text": match_put.group(1).strip(), "line": int(match_put.group(2))}
+
+
      # =========================================
     # 💬 SPOTIFY
     # =========================================
@@ -145,12 +498,13 @@ def process_nlp(command):
         return {"app": "calculator", "action": "close"}
 
     # 🔥 ADVANCED MATH COMMANDS (MUST BE ABOVE BASIC MATH)
-    if any(word in cmd for word in ["square", "root", "factorial", "pi", "power"]):
+    # Use \b to ensure it matches the whole word only, not parts of "powerpoint"
+    if re.search(r"\b(square|root|factorial|pi|power)\b", cmd):
         return {
             "app": "calculator",
             "action": "calculate",
-            "expression": None   # Force calculator.py to handle the advanced logic
-        }   
+            "expression": None   
+        }
 
     # ➕ BASIC MATH COMMANDS
     if any(word in cmd for word in ["calculate", "what is", "+", "-", "*", "/", "divide", "multiply"]):
@@ -184,6 +538,23 @@ def process_nlp(command):
     elif "close whatsapp" in cmd:
         return {"app": "whatsapp", "action": "close"}
 
+    elif "voice message" in cmd or "voice note" in cmd:
+        match = re.search(r"voice (?:message|note)(?: to)? (.+)", cmd)
+
+        contact = None
+        if match:
+            contact = match.group(1).strip()
+
+        return {
+            "app": "whatsapp",
+            "action": "voice_note",
+            "contact": contact
+        }   
+
+    # 🛑 STOP RECORDING
+    elif "stop recording" in cmd or "stop voice" in cmd:
+        return {"app": "whatsapp", "action": "stop_voice"}
+    
     # 💬 SEND MESSAGE TO CONTACT (SMARTER REGEX)
     elif "message to" in cmd or "whatsapp to" in cmd:
         try:
@@ -206,6 +577,9 @@ def process_nlp(command):
             }
         except:
             pass
+
+
+    
 
     # SEND NORMAL MESSAGE
     elif "send message" in cmd:
@@ -264,21 +638,7 @@ def process_nlp(command):
             "contact": contact
         }
 
-    # 💬 WHATSAPP VOICE MESSAGE
-    if "voice message" in cmd or "voice note" in cmd:
-        result["app"] = "whatsapp"
-        result["action"] = "voice_note"
-
-        words = cmd.split()
-
-        if "to" in words:
-            idx = words.index("to")
-            if idx + 1 < len(words):
-                result["contact"] = words[idx + 1]
-        else:
-            result["contact"] = words[-1]
-
-        return result
+    
         
     # 📩 READ WHATSAPP MESSAGES
     if "read" in cmd and "message" in cmd:
@@ -353,127 +713,7 @@ def process_nlp(command):
             "contact": name
         }
 
-    # =========================================
-    # 📝 NOTEPAD SECTION
-    # =========================================
-    
-    # =========================================
-    # 📝 FULL SMART NOTEPAD NLP (16 FEATURES)
-    # =========================================
-
-    # 1 & 2. OPEN / CLOSE
-    if "open notepad" in cmd:
-        return {"app": "notepad", "action": "open"}
-    elif "close notepad" in cmd:
-        return {"app": "notepad", "action": "close"}
-
-    # 4. SMART SAVE (Handles: "save as report", "save file test")
-    # 💾 SMART SAVE (High Priority)
-    # This must come BEFORE any simple "if 'save' in cmd" check
-    match_save = re.search(r"save (?:it |file )?(?:as|called|with name)? (.*)", raw_text_command, re.IGNORECASE)
-    
-    if match_save:
-        filename = match_save.group(1).strip()
-        # Clean up any leftover punctuation from the sentence split
-        filename = filename.replace(".", "").replace(",", "").strip()
-        if not filename.endswith(".txt"): 
-            filename += ".txt"
-        return {"app": "notepad", "action": "save", "text": filename}
-
-    # Fallback only if no filename is provided
-    elif "save" in cmd:
-        return {"app": "notepad", "action": "save", "text": "test.txt"}
-
-    # 11. DELETE WORD FROM LINE (Priority Check)
-    match_del_line = re.search(r"delete word (.*?) from line (\d+)", cmd)
-    if match_del_line:
-        return {"app": "notepad", "action": "delete", "text": match_del_line.group(1).strip(), "line": int(match_del_line.group(2))}
-
-    # 5 & 9. DELETE LINE / DELETE WORD
-    elif "delete line" in cmd:
-        return {"app": "notepad", "action": "delete_line"}
-    elif "delete word" in cmd:
-        return {"app": "notepad", "action": "delete", "text": cmd.split("delete word")[-1].strip()}
-
-    # 14. INSERT TEXT AT LINE
-    match_ins_line = re.search(r"(?:insert|add|put) (.*?) (?:at|on|in) line (\d+)", cmd)
-    if match_ins_line:
-        return {"app": "notepad", "action": "insert", "text": match_ins_line.group(1).strip(), "line": int(match_ins_line.group(2))}
-
-    # 8. REPLACE WORD
-    match_replace = re.search(r"(?:replace|change) (.*?) (?:with|to) (.*)", cmd)
-    if match_replace:
-        return {"app": "notepad", "action": "replace", "old_text": match_replace.group(1).strip(), "new_text": match_replace.group(2).strip()}
-
-    # 10. UNDO / REDO
-    if "undo" in cmd:
-        return {"app": "notepad", "action": "undo"}
-    elif "redo" in cmd:
-        return {"app": "notepad", "action": "redo"}
-
-    # 12. NEW LINE / PARAGRAPH
-    if "new paragraph" in cmd:
-        return {"app": "notepad", "action": "new_paragraph"}
-    elif "new line" in cmd:
-        return {"app": "notepad", "action": "new_line"}
-
-    # 13. CURSOR MOVEMENT
-    if "move" in cmd:
-        for direction in ["left", "right", "up", "down"]:
-            if direction in cmd:
-                return {"app": "notepad", "action": "move", "direction": direction}
-
-    # 16. SPACE (Added)
-    elif cmd == "space" or "add space" in cmd:
-        return {"app": "notepad", "action": "space"}
-
-    # 15. INSERT AT CURSOR (Generic Add/Insert)
-    if "insert" in cmd or "add" in cmd:
-        text = cmd.replace("insert", "").replace("add", "").strip()
-        return {"app": "notepad", "action": "insert", "text": text}
-
-    # 3. WRITE / TYPE
-    # Inside your nlp.py Notepad section
-    if "write" in cmd or "type" in cmd:
-        # Use a regex that ONLY removes the trigger word at the start
-        text_to_write = re.sub(r'^(write|type|add)\s+', '', raw_text_command, flags=re.IGNORECASE).strip()
-        return {"app": "notepad", "action": "write", "text": text_to_write}
-
-    # 5. CLEAR / 6. NEW FILE / 7. READ
-    if "clear" in cmd or "empty" in cmd:
-        return {"app": "notepad", "action": "clear"}
-    elif "new file" in cmd or "create file" in cmd:
-        return {"app": "notepad", "action": "new"}
-    elif "read" in cmd:
-        return {"app": "notepad", "action": "read"}
-    
-    # =========================================
-    # 📝 NATURAL LANGUAGE NOTEPAD
-    # =========================================
-
-    # ✍️ WRITE (Natural: "say hello", "tell him i am coming", "type something")
-    match_write = re.search(r"(?:write|type|say|tell him|tell her) (.*)", cmd)
-    if match_write and "line" not in cmd and "save" not in cmd:
-        return {"app": "notepad", "action": "write", "text": match_write.group(1).strip()}
-
-    # 💾 SAVE (Natural: "save it", "save as notes", "call the file x")
-    match_save = re.search(r"save (?:it |file )?(?:as|called|with name)? (.*)", cmd)
-    if match_save:
-        filename = match_save.group(1).strip()
-        if not filename.endswith(".txt"): filename += ".txt"
-        return {"app": "notepad", "action": "save", "text": filename}
-
-    # 🔄 REPLACE (Natural: "swap x for y", "turn x into y")
-    match_swap = re.search(r"(?:swap|turn|change) (.*?) (?:for|into|to) (.*)", cmd)
-    if match_swap:
-        return {"app": "notepad", "action": "replace", "old_text": match_swap.group(1).strip(), "new_text": match_swap.group(2).strip()}
-
-    # ➕ INSERT (Natural: "put x on line y", "squeeze x into line y")
-    match_put = re.search(r"(?:put|squeeze|insert|add) (.*?) (?:on|at|into) line (\d+)", cmd)
-    if match_put:
-        return {"app": "notepad", "action": "insert", "text": match_put.group(1).strip(), "line": int(match_put.group(2))}
-
-    # =========================================
+        return result # 🔥 CRITICAL: This stops it from falling into Notepad!
     # 📂 FILE & FOLDER OPERATIONS (NEW)
     # =========================================
     
@@ -514,85 +754,7 @@ def process_nlp(command):
             "intent": intent,
             "entities": {"path": name}
         }
-    # =========================================
-    # 📄 MS WORD 
-    # =========================================
-    if "word" in cmd:
-        result = {"app": "word", "action": None}
-        
-        # 1 & 2. Open / Close
-        if "open" in cmd:
-            result["action"] = "open"
-        elif "close" in cmd:
-            result["action"] = "close"
-            
-        # 3. New Document
-        elif "new document" in cmd or "new file" in cmd:
-            result["action"] = "new"
-            
-        # 4. Write
-        elif "write" in cmd or "type" in cmd:
-            result["action"] = "write"
-            # Remove the trigger word but keep exact casing
-            text = re.sub(r'^(write|type)\s+', '', raw_text_command, flags=re.IGNORECASE).strip()
-            # Clean up mentions of the app
-            text = re.sub(r'\s+in word$', '', text, flags=re.IGNORECASE)
-            result["text"] = text
-            
-        # 5 & 6. Save & Folder specific
-        elif "save" in cmd:
-            result["action"] = "save"
-            
-            # Smart location detection
-            if "desktop" in cmd:
-                result["folder"] = os.path.expanduser("~\\Desktop")
-            elif "documents" in cmd:
-                result["folder"] = os.path.expanduser("~\\Documents")
-            
-            # Extract filename (e.g., "save as report on desktop")
-            match = re.search(r"save (?:it |file )?(?:as|called|with name)? (.*?)(?: in| to| on|$)", cmd)
-            if match:
-                filename = match.group(1).strip()
-                if not filename.endswith(".docx"):
-                    filename += ".docx"
-                result["text"] = filename
-            else:
-                result["text"] = "Document.docx"
-                
-        # 9. Headings
-        elif "heading" in cmd:
-            result["action"] = "heading"
-            match = re.search(r"heading (\d)", cmd)
-            result["level"] = int(match.group(1)) if match else 1
-            
-        # 7. Styling
-        elif "bold" in cmd:
-            result["action"] = "style"
-            result["style"] = "bold"
-        elif "italic" in cmd:
-            result["action"] = "style"
-            result["style"] = "italic"
-        elif "underline" in cmd:
-            result["action"] = "style"
-            result["style"] = "underline"
-            
-        # 8. Alignment
-        elif "align center" in cmd or "center align" in cmd:
-            result["action"] = "alignment"
-            result["align"] = "center"
-        elif "align right" in cmd or "right align" in cmd:
-            result["action"] = "alignment"
-            result["align"] = "right"
-        elif "align left" in cmd or "left align" in cmd:
-            result["action"] = "alignment"
-            result["align"] = "left"
-        elif "justify" in cmd:
-            result["action"] = "alignment"
-            result["align"] = "justify"
-            
-        if result["action"]:
-            return result
-
+  
 
 
 

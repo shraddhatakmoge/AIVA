@@ -9,13 +9,17 @@
 #         time.sleep(0.1)
 # except KeyboardInterrupt:
 #     print("\nDone.")
+import google.generativeai as genai
 
-import os
-import time
-import pyautogui
+# 🔥 Paste your API key here
+API_KEY = "YAIzaSyC8MWSLp9NcKIiS1i8kySq-SF9Z0QSq4b4"
+genai.configure(api_key=API_KEY)
 
-print("Test: Trying to open Word...")
-os.startfile("winword")
-time.sleep(5)
-pyautogui.press('enter')
-print("Test: Did it work?")
+print("🔍 Scanning for available Gemini models...\n")
+
+try:
+    for m in genai.list_models():
+        if 'generateContent' in m.supported_generation_methods:
+            print(f"✅ Found Model: {m.name}")
+except Exception as e:
+    print(f"❌ Connection Error: {e}")

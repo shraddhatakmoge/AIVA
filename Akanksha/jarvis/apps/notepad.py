@@ -22,9 +22,29 @@ pyautogui.PAUSE = 0.1
 
 # -------- OPEN --------
 def open_notepad():
+    # 1. Look for any existing Notepad windows first
+    windows = gw.getWindowsWithTitle("Notepad")
     
+    for win in windows:
+        try:
+            # Try to activate it. If it's a ghost, this throws an error.
+            if win.isMinimized:
+                win.restore()
+            win.activate()
+            print("✅ JARVIS: Notepad is already open. Brought to front!")
+            return win # Success! Stop here.
+        except:
+            # It was a ghost window, ignore it and keep looking
+            continue 
+            
+    # 2. If we get here, there are no valid windows. Let's open one!
+    print("🚀 JARVIS: Opening a fresh Notepad...")
     os.system("start notepad")
     time.sleep(2)
+    
+    # 3. Grab the new window so JARVIS can use it
+    return focus_notepad()
+
 
 # ---------- CLOSE ---------
 def close_notepad():
@@ -40,15 +60,13 @@ def focus_notepad():
             if win.isMinimized:
                 win.restore()
             win.activate()
-            time.sleep(0.5)
+            time.sleep(0.2)
             return win
         except:
             continue
 
-    open_notepad()
-    windows = gw.getWindowsWithTitle("Notepad")
-    return windows[0] if windows else None
-
+    # If JARVIS tries to focus but Notepad is completely closed, open it for the user
+    return open_notepad()
 
 def click_inside_notepad(win):
     if win:
