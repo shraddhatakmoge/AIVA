@@ -58,11 +58,20 @@ def process_command(command: str) -> dict:
     structured = parser.parse(command)
 
     # 🔥 LLM FALLBACK (CLEAN + CORRECT)
-    if (
-        not structured
-        or structured.get("status") == "error"
-        or not structured.get("action")
-    ):
+    # 🔥 ONLY FALLBACK TO LLM IF ABSOLUTELY NOTHING DETECTED
+    if not structured or structured.get("status") == "error":
+
+        # 🔥 PREVENT LLM FOR SIMPLE COMMANDS
+        simple_keywords = ["mute", "unmute", "volume", "play", "pause", "resume"]
+
+        if any(k in command.lower() for k in simple_keywords):
+            return {
+                "status": "error",
+                "response": "❌ Unknown command. Try:\n- mute yt\n- volume down yt\n- play song"
+            }
+
+        # 🔥 OTHERWISE USE LLM
+        raw = llm.generate(command)
 
         raw = llm.generate(command)
 
@@ -82,7 +91,7 @@ def process_command(command: str) -> dict:
         if not structured or not structured.get("action"):
             return {
                 "status": "error",
-                "response": "Could not understand command."
+                "response": "❌ Sorry, I didn't understand that.\nTry commands like:\n- play song on yt\n- mute youtube\n- search something"
             }
 
 
@@ -94,12 +103,14 @@ def process_command(command: str) -> dict:
     valid_actions = [
         "open", "close", "search", "play_music",
         "pause", "resume", "stop",
+        "mute", "unmute", "volume_up", "volume_down",
         "add_to_favorites", "remove_favorite",
         "play_favorite", "play_last", "play_yesterday",
         "send_file", "read_messages", "send_email",
         "handle_mood", "close_browser",
         "switch_back", "switch_to_google", "switch_to_app",
-        "read_latest_email", "scroll"
+        "read_latest_email", "scroll",
+        "skip_ad"
     ]
 
     valid_targets = [
@@ -121,7 +132,7 @@ def process_command(command: str) -> dict:
         }
 
     # 🔥 FIX INVALID ACTION
-    elif structured.get("action") not in valid_actions:
+    elif structured.get("action") and structured.get("action") not in valid_actions:
         structured = {
             "action": "search",
             "target": "google",
@@ -129,7 +140,8 @@ def process_command(command: str) -> dict:
         }
 
     # 🔥 FIX INVALID TARGET
-    if structured.get("target") not in valid_targets:
+    # 🔥 FIX INVALID TARGET (DO NOT TOUCH None)
+    if structured.get("target") is not None and structured.get("target") not in valid_targets:
 
         if "music" in lower or "song" in lower:
             structured["target"] = "youtube"
@@ -146,7 +158,9 @@ def process_command(command: str) -> dict:
 
 
     # 🔥 ADD ORIGINAL COMMAND AFTER FIX
-    structured["original_command"] = command
+    # 🔥 DO NOT overwrite for multi-intent
+    if "actions" not in structured:
+        structured["original_command"] = command
 
     # 🔥 SAFE EXECUTION (no crashes in UI)
     try:
@@ -175,4 +189,8 @@ if __name__ == "__main__":
             break
 
         result = process_command(command)
-        print("Assistant:", result["response"])
+
+        if not result:
+            print("Assistant: ❌ Something went wrong.")
+        else:
+            print("Assistant:", result.get("response", "❌ No response"))

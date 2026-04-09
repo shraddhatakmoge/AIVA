@@ -301,7 +301,7 @@ You can say:
     # HANDLE COMMAND
     # -------------------------------------------------
     def handle(self, structured):
-
+        control_actions = ["mute", "unmute", "volume_up", "volume_down", "pause", "resume"]
         # 🔥 HANDLE EMAIL CONTINUATION (CRITICAL FIX)
         if structured.get("action") == "continue_email" and self.pending_email:
 
@@ -564,6 +564,7 @@ You can say:
                     "response": f'✅ File selected: "{filename}"\n\n{self._build_email_preview()}\n\nDo you want to send the mail now? (yes/no)'
                 }
 
+
             # CONFIRMATION
             # CONFIRMATION
             if step == "confirm":
@@ -698,6 +699,7 @@ You can say:
 
 
 
+
         # MULTI ACTION SUPPORT
         if "actions" in structured:
             results = []
@@ -712,7 +714,33 @@ You can say:
 
         action = structured.get("action")
         query = structured.get("query")
+        # 🔥 CONTROL COMMANDS — DO NOT START BROWSER
+        control_actions = ["mute", "unmute", "volume_up", "volume_down", "pause", "resume"]
 
+        if action == "skip_ad":
+            target = structured.get("target") or self.last_active_platform
+
+            if not target or target not in self.tabs:
+                return {
+                    "status": "error",
+                    "response": "❌ No active YouTube session."
+                }
+
+            platform = self.platform_instances.get(target)
+
+            return self._execute_platform_method(platform, "skip_ad", None)
+        if action in control_actions:
+            target = structured.get("target") or self.last_active_platform
+
+            if not target or target not in self.tabs:
+                return {
+                    "status": "error",
+                    "response": f"❌ No active {target or 'media'} session."
+                }
+
+            platform = self.platform_instances.get(target)
+
+            return self._execute_platform_method(platform, action, query)
         # -------------------------------------------------
         # 🔥 HANDLE PLATFORM REPLY (spotify / youtube)
         # -------------------------------------------------
@@ -815,6 +843,7 @@ You can say:
                 "status": "ask",
                 "response": "Please say Spotify or YouTube."
             }
+
         # -------------------------------------------------
         # 🔥 MOOD HANDLER (NEW FEATURE)
         # -------------------------------------------------
@@ -994,7 +1023,7 @@ You can say:
         original_command = structured.get("original_command", "").lower()
 
         # 🔥 ONLY FORCE TARGET FOR EXPLICIT COMMANDS
-        if action in ["play", "open", "search"]:
+        if action in ["play", "play_music", "open", "search"]:
             if "youtube" in original_command or "yt" in original_command:
                 structured["target"] = "youtube"
 
@@ -1044,7 +1073,7 @@ You can say:
             query_data = structured.get("query", {})
             to = query_data.get("to")
 
-            from contacts import CONTACTS
+
 
             if to:
                 to_clean = to.strip().lower()
@@ -1079,18 +1108,15 @@ You can say:
                 "response": "What should be the subject?"
             }
 
-        # GMAIL OPEN
-
-
-        # NORMAL FLOW
-        self._ensure_driver()
-
+        # 🔥 ENSURE DRIVER ONLY WHEN NEEDED
         if target not in self.platform_instances:
-            return {
-                "status": "error",
-                "response": f"Platform '{target}' not supported"
-            }
+            self._ensure_driver()
 
+            if target not in self.platform_instances:
+                return {
+                    "status": "error",
+                    "response": f"Platform '{target}' not supported"
+                }
         action = self._normalize_action(action)
         platform = self.platform_instances[target]
 
@@ -1147,10 +1173,13 @@ You can say:
 
         # AUTO OPEN
         just_opened = False
-        if action != "open" and target not in self.tabs:
+
+        # 🔥 ONLY AUTO-OPEN FOR PLAY / SEARCH / OPEN
+        auto_open_actions = ["play", "play_music", "search", "open"]
+
+        if action in auto_open_actions and target not in self.tabs:
             open_result = self._open_new_tab(target)
             just_opened = True
-
             if open_result.get("status") not in ["success", "login_required"]:
                 return open_result
         else:

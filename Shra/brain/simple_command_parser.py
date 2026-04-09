@@ -86,9 +86,41 @@ class SimpleCommandParser:
             "query": query
         }
 
+    def _autocorrect_command(self, command: str):
+        words = command.lower().split()
+
+        corrected_words = []
+
+        for word in words:
+            normalized = self._normalize_platform(word)
+
+            # 🔥 ONLY replace if it's a real platform
+            if normalized in self.valid_platforms:
+                corrected_words.append(normalized)
+            else:
+                corrected_words.append(word)
+
+        return " ".join(corrected_words)
+
+
     def parse(self, command: str):
         original_command = command.strip()
-        lower_command = command.lower().strip()
+
+        # 🔥 AUTO-CORRECT FIRST
+        corrected_command = self._autocorrect_command(original_command)
+
+        # 🔥 DEBUG PRINT (optional)
+        if corrected_command != original_command.lower():
+            print(f"🤖 Auto-corrected: {corrected_command}")
+
+        lower_command = corrected_command.lower().strip()
+        # 🔥 SKIP YOUTUBE AD
+        if "skip ad" in lower_command or "skip ads" in lower_command:
+            return {
+                "status": "success",
+                "action": "skip_ad",
+                "target": "youtube"
+            }
 
         # 🔥 ADD THIS (DO NOT REMOVE ANYTHING ELSE)
         if "go back to website" in lower_command or "switch back" in lower_command or lower_command == "go back":
@@ -104,6 +136,35 @@ class SimpleCommandParser:
                 "action": "switch_to_google",
                 "target": "google"
             }
+
+        # 🔥 FORCE CONTROL COMMANDS FIRST
+        volume_keywords = ["volume", "volum", "volumne", "sound", "audio"]
+
+        if any(cmd in lower_command for cmd in ["mute", "unmute"]) or any(v in lower_command for v in volume_keywords):
+
+            # 🔥 detect platform (optional)
+            if any(x in lower_command for x in ["yt", "youtube"]):
+                target = "youtube"
+            elif "spotify" in lower_command:
+                target = "spotify"
+            else:
+                target = None  # 🔥 fallback to last_active_platform
+
+            if "unmute" in lower_command:
+                return {"status": "success", "action": "unmute", "target": target}
+
+            elif "mute" in lower_command:
+                return {"status": "success", "action": "mute", "target": target}
+
+            elif any(x in lower_command for x in ["increase", "up", "raise", "louder"]):
+                return {"status": "success", "action": "volume_up", "target": target}
+
+            elif any(x in lower_command for x in ["decrease", "down", "lower", "reduce"]):
+                return {"status": "success", "action": "volume_down", "target": target}
+
+
+
+
         # 🔥 NEW: switch to app / website
         if "switch to" in lower_command:
             name = lower_command.replace("switch to", "").strip()
@@ -114,14 +175,28 @@ class SimpleCommandParser:
                 "query": name
             }
 
-
         if " and " in lower_command:
-            parts = [p.strip() for p in original_command.split(" and ")]
+            parts = [p.strip() for p in re.split(r"\b(?:and|then|after that)\b", original_command, flags=re.IGNORECASE) if p.strip()]
+            print("DEBUG MULTI PARTS:", parts)
             actions = []
+
+            last_target = None
 
             for part in parts:
                 parsed = self.parse(part)
+
                 if parsed and parsed.get("status") == "success":
+
+                    # 🔥 ADD THIS LINE (CRITICAL FIX)
+                    parsed["original_command"] = part.lower()
+
+                    # 🔥 carry forward target
+                    if last_target and not parsed.get("target"):
+                        parsed["target"] = last_target
+
+                    if parsed.get("target"):
+                        last_target = parsed["target"]
+
                     actions.append(parsed)
 
             if actions:
@@ -165,6 +240,7 @@ class SimpleCommandParser:
                 "action": "play_favorite"
             }
 
+
         if "play last song" in lower_command:
 
             if " on " in lower_command:
@@ -202,6 +278,8 @@ class SimpleCommandParser:
                 "target": "google",
                 "query": {"index": 2}
             }
+
+
         # -------------------------------------------------
         # 🔥 MOOD DETECTION (NEW FEATURE)
         # -------------------------------------------------
@@ -579,5 +657,8 @@ class SimpleCommandParser:
                     "target": target
                 }
 
-        return None
+        return {
+            "status": "error",
+            "response": "Unknown command"
+        }
 
