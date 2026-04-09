@@ -436,12 +436,18 @@ class YouTube:
 
             # 🔥 STEP 3: NORMAL VIDEO → USE PROPERTY
             result = self.driver.execute_script("""
-                const video = document.querySelector('video');
-                if (!video) return "NO_VIDEO";
+                const btn = document.querySelector('.ytp-mute-button');
 
-                if (video.muted) return "ALREADY_MUTED";
+                if (!btn) return "NO_BUTTON";
 
-                video.muted = true;
+                // 🔥 check state using aria-label
+                let label = btn.getAttribute('aria-label')?.toLowerCase() || "";
+
+                if (label.includes("unmute")) {
+                    return "ALREADY_MUTED";
+                }
+
+                btn.click();
                 return "MUTED";
             """)
 
@@ -470,13 +476,17 @@ class YouTube:
                 }
 
             result = self.driver.execute_script("""
-                const video = document.querySelector('video');
+                const btn = document.querySelector('.ytp-mute-button');
 
-                if (!video) return "NO_VIDEO";
+                if (!btn) return "NO_BUTTON";
 
-                if (!video.muted) return "ALREADY_UNMUTED";
+                let label = btn.getAttribute('aria-label')?.toLowerCase() || "";
 
-                video.muted = false;
+                if (label.includes("mute")) {
+                    return "ALREADY_UNMUTED";
+                }
+
+                btn.click();
                 return "UNMUTED";
             """)
 
