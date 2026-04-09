@@ -2,7 +2,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys   # ✅ NEW
 from selenium.webdriver.support.ui import WebDriverWait   # ✅ NEW
 from selenium.webdriver.support import expected_conditions as EC   # ✅ NEW
-from AIVA.Shra.features.browser.window_focus import bring_browser_to_front
+# from AIVA.Shra.features.browser.window_focus import bring_browser_to_front
+from features.browser.window_focus import bring_browser_to_front
 
 import time
 class Google:

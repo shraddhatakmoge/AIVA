@@ -9,7 +9,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
-from AIVA.Shra.features.browser.window_focus import bring_browser_to_front
+# from AIVA.Shra.features.browser.window_focus import bring_browser_to_front
+from features.browser.window_focus import bring_browser_to_front
 
 
 class WhatsApp:

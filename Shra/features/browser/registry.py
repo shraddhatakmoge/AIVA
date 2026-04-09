@@ -1,9 +1,13 @@
-from AIVA.Shra.features.browser.platforms.youtube import YouTube
-from AIVA.Shra.features.browser.platforms.google import Google
-from AIVA.Shra.features.browser.platforms.spotify import Spotify
-from AIVA.Shra.features.browser.platforms.gmail import Gmail
-from AIVA.Shra.features.browser.platforms.whatsapp import WhatsApp
-
+# from AIVA.Shra.features.browser.platforms.youtube import YouTube
+# from AIVA.Shra.features.browser.platforms.google import Google
+# from AIVA.Shra.features.browser.platforms.spotify import Spotify
+# from AIVA.Shra.features.browser.platforms.gmail import Gmail
+# from AIVA.Shra.features.browser.platforms.whatsapp import WhatsApp
+from features.browser.platforms.youtube import YouTube
+from features.browser.platforms.google import Google
+from features.browser.platforms.spotify import Spotify
+from features.browser.platforms.gmail import Gmail
+from features.browser.platforms.whatsapp import WhatsApp
 
 PLATFORM_REGISTRY = {
     "youtube": YouTube,

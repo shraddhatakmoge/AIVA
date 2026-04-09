@@ -1,17 +1,32 @@
+# import os
+# import glob
+# from difflib import get_close_matches
+# import random
+# from pathlib import Path
+# from AIVA.Shra.features.browser.driver import DriverManager
+# from AIVA.Shra.features.browser.platforms.youtube import YouTube
+# from AIVA.Shra.features.browser.platforms.spotify import Spotify
+# from AIVA.Shra.features.browser.platforms.google import Google
+# from AIVA.Shra.features.browser.platforms.gmail import Gmail
+# from AIVA.Shra.features.browser.platforms.whatsapp import WhatsApp
+# from AIVA.Shra.features.browser.window_focus import bring_browser_to_front
+# from contacts import CONTACTS
+
 import os
 import glob
 from difflib import get_close_matches
 import random
 from pathlib import Path
-from AIVA.Shra.features.browser.driver import DriverManager
-from AIVA.Shra.features.browser.platforms.youtube import YouTube
-from AIVA.Shra.features.browser.platforms.spotify import Spotify
-from AIVA.Shra.features.browser.platforms.google import Google
-from AIVA.Shra.features.browser.platforms.gmail import Gmail
-from AIVA.Shra.features.browser.platforms.whatsapp import WhatsApp
-from AIVA.Shra.features.browser.window_focus import bring_browser_to_front
-from contacts import CONTACTS
 
+from .driver import DriverManager
+from .platforms.youtube import YouTube
+from .platforms.spotify import Spotify
+from .platforms.google import Google
+from .platforms.gmail import Gmail
+from .platforms.whatsapp import WhatsApp
+from .window_focus import bring_browser_to_front
+
+from ...contacts import CONTACTS
 
 class BrowserController:
 

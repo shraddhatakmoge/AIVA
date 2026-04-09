@@ -1,6 +1,6 @@
 import random
 from datetime import datetime
-from AIVA.Shra.features.browser.memory.base_memory import BaseMemory
+from features.browser.memory.base_memory import BaseMemory
 
 
 class YouTubeMemory(BaseMemory):

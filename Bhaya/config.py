@@ -1,2 +1,2 @@
-ACCESS_KEY = "EJkqoOG2ILr+ybcovT05MV42wBTpNUIv+xUvbdttWefsaC/q2AjEZw=="
+ACCESS_KEY = "paste the  accsess key"
 WAKE_WORD = "jarvis"
