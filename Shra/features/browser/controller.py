@@ -745,6 +745,7 @@ You can say:
 
             return self._execute_platform_method(platform, "skip_ad", None)
         if action in control_actions:
+
             target = structured.get("target") or self.last_active_platform
 
             if not target or target not in self.tabs:
@@ -755,8 +756,12 @@ You can say:
 
             platform = self.platform_instances.get(target)
 
+            # 🔥🔥 CRITICAL FIX — SWITCH TAB FIRST
+            if target in self.tabs:
+                self._switch_to_tab(target)
+
             return self._execute_platform_method(platform, action, query)
-        # -------------------------------------------------
+            # -------------------------------------------------
         # 🔥 HANDLE PLATFORM REPLY (spotify / youtube)
         # -------------------------------------------------
         if self.pending_action:
@@ -927,8 +932,6 @@ You can say:
         # -------------------------------------------------
         if action == "add_to_favorites":
 
-
-
             target = self.last_active_platform
             platform = self.platform_instances.get(target)
 
@@ -938,14 +941,15 @@ You can say:
                     "response": "No active platform."
                 }
 
-            # 🔥 USE CURRENT SONG INSTEAD OF QUERY
-            if hasattr(platform, "current_song") and platform.current_song:
-                return platform.memory.add_favorite(platform.current_song)
+            # ✅ CALL PLATFORM METHOD (BEST PRACTICE)
+            if hasattr(platform, "add_to_favorites"):
+                return platform.add_to_favorites()
 
             return {
                 "status": "error",
-                "response": "No song is currently playing."
+                "response": "This platform does not support favorites."
             }
+
 
         # -------------------------------------------------
         # 🔥 FIX: REMOVE FROM FAVORITES (CRITICAL FIX)
@@ -962,8 +966,9 @@ You can say:
                 }
 
             # 🔥 USE CURRENT SONG INSTEAD OF QUERY
-            if hasattr(platform, "current_song") and platform.current_song:
-                return platform.memory.remove_favorite(platform.current_song)
+            # ✅ CALL PLATFORM METHOD (CLEAN DESIGN)
+            if hasattr(platform, "remove_favorite"):
+                return platform.remove_favorite()
 
             return {
                 "status": "error",

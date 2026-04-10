@@ -11,7 +11,7 @@ class SimpleCommandParser:
             "google": ["google", "googl", "gogle", "googel"],
             "youtube": ["youtube", "youtu", "youtub", "youtbe", "you tube", "yt"],
             "spotify": ["spotify", "spotfy", "spotifi", "spoti"],
-            "gmail": ["gmail", "g mail", "gmaill", "mail"],
+            "gmail": ["gmail", "g mail", "gmaill"],
             "whatsapp": ["whatsapp", "whats app", "watsapp", "whatsup"]
         }
 
@@ -94,8 +94,8 @@ class SimpleCommandParser:
         for word in words:
             normalized = self._normalize_platform(word)
 
-            # 🔥 ONLY replace if it's a real platform
-            if normalized in self.valid_platforms:
+            # 🔥 Only replace if word itself is NOT meaningful command word
+            if normalized in self.valid_platforms and word not in ["mail"]:
                 corrected_words.append(normalized)
             else:
                 corrected_words.append(word)
@@ -302,7 +302,67 @@ class SimpleCommandParser:
 
             remaining = lower_command.replace("open ", "", 1).strip()
 
-            # 🔥 CASE 1: platform open
+            # direct result commands
+            if remaining == "first result":
+                return {
+                    "status": "success",
+                    "action": "open_result",
+                    "target": "google",
+                    "query": {"index": 1}
+                }
+
+            if remaining == "second result":
+                return {
+                    "status": "success",
+                    "action": "open_result",
+                    "target": "google",
+                    "query": {"index": 2}
+                }
+
+            if remaining == "third result":
+                return {
+                    "status": "success",
+                    "action": "open_result",
+                    "target": "google",
+                    "query": {"index": 3}
+                }
+
+            # ✅ IMPORTANT FIX: handle "open ibm one", "open amazon first", etc.
+            match = re.match(r"(.+?)\s+(first|one|1|second|two|2|third|three|3)\s*$", remaining)
+            print("DEBUG OPEN MATCH:", remaining)
+
+            if match:
+                name = match.group(1).strip()
+                rank_word = match.group(2).strip()
+
+                index_map = {
+                    "first": 1, "one": 1, "1": 1,
+                    "second": 2, "two": 2, "2": 2,
+                    "third": 3, "three": 3, "3": 3,
+                }
+
+                print("🔥 FORCE RETURN OPEN:", name, index_map[rank_word])
+
+                return {
+                    "status": "success",
+                    "action": "open_result_by_name",
+                    "target": "google",
+                    "query": {
+                        "name": name,
+                        "index": index_map[rank_word]
+                    }
+                }
+            # 🔥 HARD STOP (prevents falling into search)
+            return {
+                "status": "success",
+                "action": "open_result_by_name",
+                "target": "google",
+                "query": {
+                    "name": remaining,
+                    "index": 1
+                }
+            }
+            # platform open
             normalized = self._normalize_platform(remaining)
             if normalized in self.valid_platforms:
                 return {
@@ -311,7 +371,7 @@ class SimpleCommandParser:
                     "target": normalized
                 }
 
-            # 🔥 CASE 2: open search result (name + index)
+            # fallback open result by name
             words = remaining.split()
 
             index_map = {
@@ -331,14 +391,22 @@ class SimpleCommandParser:
 
             name = " ".join(name_parts).strip()
 
-            return {
-                "status": "success",
-                "action": "open_result_by_name",
-                "target": "google",
-                "query": {
-                    "name": name,
-                    "index": index or 1
+            if name:
+                print("DEBUG OPEN NAME:", name, "INDEX:", index)
+
+                return {
+                    "status": "success",
+                    "action": "open_result_by_name",
+                    "target": "google",
+                    "query": {
+                        "name": name.strip(),
+                        "index": index if index else 1
+                    }
                 }
+
+            return {
+                "status": "error",
+                "response": "Unknown open command"
             }
 
 

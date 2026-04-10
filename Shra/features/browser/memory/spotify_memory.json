@@ -1,14 +1,14 @@
 {
     "favorites": [
         {
-            "song": "jhol",
-            "spotify_id": null,
-            "added_at": "2026-04-08T19:46:25.732870"
-        },
-        {
             "song": "closer",
             "spotify_id": null,
             "added_at": "2026-04-08T19:50:58.883097"
+        },
+        {
+            "song": "jhol",
+            "spotify_id": null,
+            "added_at": "2026-04-09T20:50:40.128130"
         }
     ],
     "history": [
@@ -61,6 +61,36 @@
             "song": "jhol",
             "spotify_id": null,
             "played_at": "2026-04-09T09:04:52.587903"
+        },
+        {
+            "song": "jhol",
+            "spotify_id": null,
+            "played_at": "2026-04-09T20:49:57.865691"
+        },
+        {
+            "song": "closer",
+            "spotify_id": null,
+            "played_at": "2026-04-09T20:51:24.965057"
+        },
+        {
+            "song": "infinity",
+            "spotify_id": null,
+            "played_at": "2026-04-10T05:42:24.895781"
+        },
+        {
+            "song": "closer",
+            "spotify_id": null,
+            "played_at": "2026-04-10T05:47:51.929733"
+        },
+        {
+            "song": "closer",
+            "spotify_id": null,
+            "played_at": "2026-04-10T05:55:13.795378"
+        },
+        {
+            "song": "closer",
+            "spotify_id": null,
+            "played_at": "2026-04-10T06:05:00.541565"
         }
     ]
 }

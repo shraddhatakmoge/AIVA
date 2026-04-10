@@ -404,6 +404,8 @@ class YouTube:
             is_playing = self._is_playing()
 
             if is_playing is None:
+                bring_browser_to_front()
+                time.sleep(1)
                 return {
                     "status": "error",
                     "response": "❌ No active YouTube video."
@@ -447,24 +449,19 @@ class YouTube:
 
             # 🔥 STEP 3: NORMAL VIDEO → USE PROPERTY
             # STEP 1: check already muted
+            # 🔥 ALWAYS USE BUTTON (REAL USER ACTION)
             result = self.driver.execute_script("""
                 const video = document.querySelector('video');
-                if (!video) return "NO_VIDEO";
+                const btn = document.querySelector('.ytp-mute-button');
+
+                if (!video || !btn) return "NO_VIDEO";
 
                 if (video.muted) {
                     return "ALREADY_MUTED";
                 }
 
-                video.muted = true;
+                btn.click();
                 return "MUTED";
-            """)
-
-            if result == "ALREADY_MUTED":
-                return {"status": "info", "response": "YouTube is already muted"}
-
-            # STEP 2: detect ad
-            is_ad = self.driver.execute_script("""
-                return document.querySelector('.ytp-ad-player-overlay') !== null;
             """)
 
             if result == "ALREADY_MUTED":
@@ -526,20 +523,22 @@ class YouTube:
             # 🔥 STEP 2: NORMAL VIDEO
             result = self.driver.execute_script("""
                 const video = document.querySelector('video');
-                if (!video) return "NO_VIDEO";
+                const btn = document.querySelector('.ytp-mute-button');
+
+                if (!video || !btn) return "NO_VIDEO";
 
                 if (!video.muted) {
                     return "ALREADY_UNMUTED";
                 }
 
-                video.muted = false;
+                btn.click();
                 return "UNMUTED";
             """)
 
             if result == "ALREADY_UNMUTED":
                 return {"status": "info", "response": "YouTube is already unmuted"}
 
-            if result in ["UNMUTED", "UNMUTED_FALLBACK"]:
+            if result == "UNMUTED":
                 return {"status": "success", "response": "Unmuted YouTube"}
 
             return {
