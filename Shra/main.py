@@ -110,7 +110,8 @@ def process_command(command: str) -> dict:
         "handle_mood", "close_browser",
         "switch_back", "switch_to_google", "switch_to_app",
         "read_latest_email", "scroll",
-        "skip_ad"
+        "skip_ad",
+        "open_result_by_name"
     ]
 
     valid_targets = [

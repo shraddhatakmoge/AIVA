@@ -267,6 +267,12 @@ class BrowserController:
 
         name = name.lower()
 
+        # 🔥 CLEAN EXTRA WORDS (CRITICAL FIX)
+        for word in ["website", "site", "tab", "page"]:
+            name = name.replace(word, "")
+
+        name = name.strip()
+
         for handle, meta in self.tab_metadata.items():
 
             # 🔥 MATCH PLATFORM (spotify, youtube etc.)
@@ -729,6 +735,8 @@ You can say:
 
         action = structured.get("action")
         query = structured.get("query")
+
+
         # 🔥 CONTROL COMMANDS — DO NOT START BROWSER
         control_actions = ["mute", "unmute", "volume_up", "volume_down", "pause", "resume"]
 
@@ -761,6 +769,8 @@ You can say:
                 self._switch_to_tab(target)
 
             return self._execute_platform_method(platform, action, query)
+
+
             # -------------------------------------------------
         # 🔥 HANDLE PLATFORM REPLY (spotify / youtube)
         # -------------------------------------------------
@@ -908,7 +918,8 @@ You can say:
                 })
         # 🔥 NEW SWITCH HANDLER
         if action == "switch_to_app":
-            target_name = structured.get("query")
+            target_name = str(structured.get("query")).lower()
+            target_name = target_name.replace("website", "").strip()
             return self.switch_to_tab_by_name(target_name)
 
         # 🔥 HANDLE NON-PLATFORM ACTIONS FIRST
@@ -1054,6 +1065,24 @@ You can say:
         target = self._detect_target(structured)
         structured["target"] = target
         # 🔥 FORCE GOOGLE TAB FOR SEARCH (CORRECT POSITION)
+        # 🔥 HANDLE OPEN RESULT BY NAME (CRITICAL FIX)
+        print("🔥 FINAL ACTION:", action)
+        print("🔥 FINAL QUERY:", query)
+        if action == "open_result_by_name":
+
+            self._ensure_driver()
+
+            if "google" in self.tabs:
+                self._switch_to_tab("google")
+            else:
+                self._open_new_tab("google")
+
+            platform = self.platform_instances["google"]
+
+            name = query.get("name")
+            index = query.get("index", 1)
+
+            return platform.open_result_by_name(name, index)
         if action == "search" and target == "google":
 
             self._ensure_driver()

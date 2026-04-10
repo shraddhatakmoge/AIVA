@@ -34,9 +34,9 @@ class ResponseParser:
                     "query": {
                         "name": name,
                         "index": index_map[rank]
-                    }
+                    },
+                    "original_command": raw_response  # 🔥 CRITICAL FIX
                 }
-
             # ---------------- NORMAL FLOW ----------------
 
             match = re.search(r"\{.*\}", raw_response, re.DOTALL)

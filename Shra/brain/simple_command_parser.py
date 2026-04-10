@@ -121,9 +121,17 @@ class SimpleCommandParser:
                 "action": "skip_ad",
                 "target": "youtube"
             }
+        if "switch to" in lower_command:
+            name = lower_command.replace("switch to", "").strip()
+
+            return {
+                "status": "success",
+                "action": "switch_to_app",
+                "query": name
+            }
 
         # 🔥 ADD THIS (DO NOT REMOVE ANYTHING ELSE)
-        if "go back to website" in lower_command or "switch back" in lower_command or lower_command == "go back":
+        if lower_command.strip() in ["switch back", "go back"]:
             return {
                 "status": "success",
                 "action": "switch_back",
@@ -163,17 +171,6 @@ class SimpleCommandParser:
                 return {"status": "success", "action": "volume_down", "target": target}
 
 
-
-
-        # 🔥 NEW: switch to app / website
-        if "switch to" in lower_command:
-            name = lower_command.replace("switch to", "").strip()
-
-            return {
-                "status": "success",
-                "action": "switch_to_app",
-                "query": name
-            }
 
         if " and " in lower_command:
             parts = [p.strip() for p in re.split(r"\b(?:and|then|after that)\b", original_command, flags=re.IGNORECASE) if p.strip()]

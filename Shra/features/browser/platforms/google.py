@@ -104,11 +104,15 @@ class Google:
 
             matched = []
 
-            for element in results:
-                title = element.text.strip().lower()
+            for i, element in enumerate(results):
+                try:
+                    title = element.find_element(By.TAG_NAME, "h3").text.strip().lower()
+                    print("🔍 RESULT TITLE:", title)
+                except:
+                    continue
 
                 if name in title:
-                    matched.append(element)
+                    matched.append((i, element))  # 🔥 store original position
 
             # ✅ IF FOUND MATCHES
             if matched:
@@ -119,7 +123,7 @@ class Google:
                         "response": f"Only {len(matched)} results found"
                     }
 
-                element = matched[index - 1]
+                _, element = matched[index - 1]
                 href = element.get_attribute("href")
 
                 if not href:
@@ -128,11 +132,9 @@ class Google:
                         "response": "Could not get link"
                     }
 
-                self.driver.execute_script(
-                    "window.open(arguments[0], '_blank');", href
-                )
-
-                self.driver.switch_to.window(self.driver.window_handles[-1])
+                # 🔥 OPEN IN NEW TAB (SAFE + RELIABLE)
+                self.driver.switch_to.new_window('tab')
+                self.driver.get(href)
 
                 return {
                     "status": "success",
