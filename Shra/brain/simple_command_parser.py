@@ -350,6 +350,40 @@ class SimpleCommandParser:
                     }
                 }
             # 🔥 HARD STOP (prevents falling into search)
+            # 🔥 FIRST CHECK: is it a platform?
+            normalized = self._normalize_platform(remaining)
+
+            if normalized in self.valid_platforms:
+                return {
+                    "status": "success",
+                    "action": "open",
+                    "target": normalized
+                }
+
+            # 🔥 THEN check result commands like "ibm one"
+            match = re.match(r"(.+?)\s+(first|one|1|second|two|2|third|three|3)\s*$", remaining)
+
+            if match:
+                name = match.group(1).strip()
+                rank_word = match.group(2).strip()
+
+                index_map = {
+                    "first": 1, "one": 1, "1": 1,
+                    "second": 2, "two": 2, "2": 2,
+                    "third": 3, "three": 3, "3": 3,
+                }
+
+                return {
+                    "status": "success",
+                    "action": "open_result_by_name",
+                    "target": "google",
+                    "query": {
+                        "name": name,
+                        "index": index_map[rank_word]
+                    }
+                }
+
+            # 🔥 FINAL fallback → google search result
             return {
                 "status": "success",
                 "action": "open_result_by_name",
