@@ -364,56 +364,102 @@ def stop_voice_message():
     print("✅ Voice message sent")
     
 # -------- SEND ATTACHMENT (DOCUMENT/FILE) --------
-def send_attachment(contact, file_path):
+def send_attachment(contact, filename, search_location=None):
+    """
+    Portable version: Uses keyboard shortcuts and dynamic pathing.
+    No hardcoded coordinates or user-specific paths.
+    """
+    # --- STEP 1: DYNAMIC PATH RESOLUTION ---
+    user_home = os.path.expanduser("~")
+    
+    # Map spoken locations to actual system paths
+    location_map = {
+        "desktop": os.path.join(user_home, "Desktop"),
+        "downloads": os.path.join(user_home, "Downloads"),
+        "documents": os.path.join(user_home, "Documents")
+    }
+    
+    file_path = None
+    
+    # If you specified a location (e.g., "from desktop")
+    if search_location and search_location.lower() in location_map:
+        file_path = os.path.join(location_map[search_location.lower()], filename)
+    else:
+        # Otherwise, search all common folders automatically
+        for folder in location_map.values():
+            temp_path = os.path.join(folder, filename)
+            if os.path.exists(temp_path):
+                file_path = temp_path
+                break
 
-    # 1. Bring WhatsApp to focus
+    if not file_path or not os.path.exists(file_path):
+        print(f"❌ JARVIS: Could not find '{filename}' in common folders.")
+        return
+
+    # --- STEP 2: PORTABLE UI NAVIGATION ---
     focus_whatsapp()
     time.sleep(1)
 
-    # 2. Open chat (using your existing search logic)
+    # Universal Search shortcut
     pyautogui.hotkey("ctrl", "f")
-    time.sleep(1)
-
-    pyautogui.hotkey("ctrl", "a")
-    pyautogui.press("backspace")
-
+    time.sleep(0.5)
+    pyautogui.hotkey("ctrl", "a")   # select all
+    time.sleep(0.3)
+    pyautogui.press("backspace")    # delete
+    time.sleep(0.3)
     pyautogui.write(contact)
-    time.sleep(2)
-
-    pyautogui.press("down")
+    time.sleep(1.5)
     pyautogui.press("enter")
     time.sleep(1)
 
-    # 3. Click the "+" (Attach) button
-    # ⚠️ CHANGE THESE COORDS: Hover over the "+" button next to the chat box
-    pyautogui.moveTo(610, 963) 
-    time.sleep(0.5)
-    pyautogui.click()
+    print(f"📎 JARVIS: Attaching {filename}...")
+    
+    # Navigation: From the message box, Shift+Tab usually hits the '+' button
+    pyautogui.hotkey("shift", "tab")
+    pyautogui.hotkey("shift", "tab")
+
+    time.sleep(0.3)
+    pyautogui.press("enter") # Opens the attachment menu
     time.sleep(1)
 
-    # 4. Click the "Document" option from the menu
-    # ⚠️ CHANGE THESE COORDS: Hover over the "Document" button that pops up
-    pyautogui.moveTo(539, 509) 
-    time.sleep(0.5)
-    pyautogui.click()
+    # Select 'Document' (First item in menu)
+    pyautogui.press("enter") 
     time.sleep(2)
 
-    # 5. Windows File Dialog opens (it automatically focuses on the file name box)
-    # Write the absolute file path and hit Enter
-    pyautogui.write(file_path, interval=0.02)
-    time.sleep(1)
+    # Standard Windows File Dialog (This is universal)
+    pyautogui.write(file_path)
+    time.sleep(0.5)
     pyautogui.press("enter")
     
-    # 6. Wait for WhatsApp to load the file preview, then send!
-    time.sleep(2) 
-    pyautogui.press("enter")
+    # ==========================================
+    # 🔥 THE FIX STARTS HERE
+    # ==========================================
+    
+    # 1. Wait longer for the Preview screen to appear
+    print("⏳ JARVIS: Waiting for file preview...")
+    time.sleep(4) 
+    
+    # 2. RE-FOCUS WHATSAPP (Crucial: The Dialog closure steals focus!)
+    focus_whatsapp() 
+    time.sleep(0.5)
 
-    print(f"✅ Attachment '{file_path}' sent to {contact}")
+    # 3. Press TAB once
+    # This moves focus from the 'Add a caption' box to the actual 'Send' button
+    pyautogui.press("tab")
+    time.sleep(0.3)
+
+    # 4. Final Send
+    pyautogui.press("enter")
+    
+    print(f"✅ JARVIS: Document '{filename}' sent to {contact}")
    
    
 # -------- SEND CONTACT CARD --------
 def send_contact_card(target_person, contact_to_share):
-
+    """
+    Portable version: Uses keyboard navigation instead of coordinates 
+    to ensure it works on any screen resolution.
+    """
     # 1. Bring WhatsApp to focus & open the target's chat
     focus_whatsapp()
     time.sleep(1)
@@ -426,45 +472,47 @@ def send_contact_card(target_person, contact_to_share):
     time.sleep(2)
     pyautogui.press("down")
     pyautogui.press("enter")
-    time.sleep(1)
+    time.sleep(1.5)
 
-    # 2. Click the "+" (Attach) button
-    # ⚠️ Use your existing coordinates for the + button here
-    pyautogui.moveTo(610, 963) 
+    # 2. Open Attachment Menu using keyboard
+    # From the message box, Shift+Tab twice usually lands on the '+' button
+    pyautogui.hotkey("shift", "tab")
+    pyautogui.hotkey("shift", "tab")
     time.sleep(0.5)
-    pyautogui.click()
+    pyautogui.press("enter") 
+    time.sleep(1.5)
+
+    # 3. Navigate to "Contact" in the menu
+    # Usually, 'Contact' is the 4th item down in the attachment menu
+    for _ in range(4):
+        pyautogui.press("down")
+        time.sleep(0.1)
+    pyautogui.press("enter")
     time.sleep(2)
 
-    # 3. Click the "Contact" option from the menu
-    # ⚠️ NEW COORDS NEEDED: Hover over the blue "Contact" icon in your screenshot!
-    pyautogui.moveTo(591, 748) # <-- Change these!
-    time.sleep(0.5)
-    pyautogui.click()
-    time.sleep(1.5)
-
-    # 4. The "Search contacts" popup appears. Type the name.
+    # 4. Search and Select the contact card
     pyautogui.write(contact_to_share, interval=0.05)
-    time.sleep(2) # Give it 2 full seconds to load the search results
+    time.sleep(2.5) # Wait for search results to populate
 
-    # 5. Press down to highlight them, and Enter to check the box
     pyautogui.press("down")
-    time.sleep(0.5)
-    pyautogui.press("enter") # This checks the green box
+    time.sleep(0.3)
+    pyautogui.press("enter") # Checks the box for the contact
     time.sleep(1)
 
-    # 6. Click the green Send arrow!
-    # ⚠️ Put the new coordinates for the green arrow here!
-    pyautogui.moveTo(1237, 912) 
-    time.sleep(0.5)
-    pyautogui.click()
-    time.sleep(1.5)
+    # 5. Final Send Sequence
+    # Tab to jump from the search box to the 'Send' arrow
+    # Usually 2-3 tabs are needed to reach the final green arrow
+    for _ in range(3):
+        pyautogui.press("tab")
+        time.sleep(0.5)
+        pyautogui.press("enter")
+        
+    pyautogui.press("tab")
+    pyautogui.press("tab")
+    pyautogui.press("enter")
     
-    time.sleep(2.5)
-    # 7. Click the SECOND green Send arrow (Final Confirmation!)
-    # (Using the new coordinates you found)
-    pyautogui.moveTo(1279, 818) 
-    time.sleep(0.5)
-    pyautogui.click()
+
     
-    # Just the print statement, no speaking!
+   
+    
     print(f"✅ Contact card for '{contact_to_share}' sent to {target_person}")

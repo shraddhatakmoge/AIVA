@@ -56,9 +56,17 @@ def open_word():
         print(f"❌ Error opening Word: {e}")
 
 def close_word():
-    print("❌ Closing Word...")
-    # Use the process name found in Task Manager for Word
-    close_app("WINWORD.EXE")
+    """
+    Universal Force-Close: Kills all Word processes.
+    The /T flag ensures all 'child' windows are closed, and /F forces it.
+    """
+    print("❌ JARVIS: Shutting down Microsoft Word...")
+    
+    # 🔥 THE PORTABLE WAY: Taskkill is much more reliable than close_app()
+    # This hits 'WINWORD.EXE' directly.
+    os.system("taskkill /f /im WINWORD.EXE /t >nul 2>&1")
+    
+    print("✅ Word closed.")
         
 # -------- 3. CREATE NEW DOCUMENT --------
 def new_document():
@@ -83,77 +91,49 @@ def write_in_word(text):
         print("❌ Word is not open! Please open Word first.")
 
 # -------- 5 & 6. SAVE (NAME & SPECIFIC FOLDER) --------
-def save_word_file(filename, folder_path=None):
-    if focus_word():
-        print("💾 JARVIS: Opening Save dialog...")
-        
-        pyautogui.press('f12')
-        time.sleep(2.5) # Wait for the window
-        
-        # 🔥 CLEAR THE BOX FIRST
-        pyautogui.hotkey('ctrl', 'a')
-        time.sleep(0.2)
-        pyautogui.press('backspace')
-        time.sleep(0.2)
-        
-        if folder_path:
-            # Type the absolute path so Windows knows EXACTLY where to put it
-            full_path = os.path.join(folder_path, filename)
-            pyautogui.write(full_path, interval=0.02)
-        else:
-            pyautogui.write(filename, interval=0.02)
-            
-        time.sleep(0.5)
-        pyautogui.press('enter')
-        print(f"✅ Document saved to: {folder_path if folder_path else 'Default Folder'} as {filename}")
+def save_word_file(file_name, folder_path=None):
+    """
+    Universal Save: Uses F12 to bypass the Word 'File' menu.
+    """
+    focus_word()
+    time.sleep(0.5)
+
+    # 1. Trigger 'Save As' Dialog
+    pyautogui.press('f12')
+    time.sleep(1.5) # Wait for dialog to open
+
+    # 2. Construct the full path
+    if folder_path:
+        full_path = os.path.join(folder_path, file_name)
     else:
-        print("❌ Word is not open! Cannot save.")
+        # Default to Desktop if no folder was specified
+        full_path = os.path.join(os.path.expanduser("~\\Desktop"), file_name)
+
+    # 3. Type path and Save
+    pyautogui.write(full_path, interval=0.05)
+    time.sleep(0.5)
+    pyautogui.press('enter')
+
+    print(f"✅ JARVIS: Document saved as '{full_path}'")
 
 # -------- 8. ALIGNMENT (SMART ENGINE + VISUAL) --------
-def set_alignment(align):
-    print(f"📐 JARVIS: Preparing to align text to the {align}...")
+def set_alignment(align_type):
+    """
+    Portable Alignment: Uses Ctrl shortcuts.
+    """
+    focus_word()
+    time.sleep(0.3)
     
-    try:
-        # 1. ATTEMPT TO CONNECT OR LAUNCH WORD
-        try:
-            word_app = win32com.client.GetActiveObject("Word.Application")
-        except:
-            print("📂 Word isn't open. Launching it via Engine...")
-            word_app = win32com.client.Dispatch("Word.Application") 
-            word_app.Visible = True
-            word_app.Documents.Add() 
-            time.sleep(2) 
-
-        # 2. 🔥 FORCE TO FRONT SO YOU CAN SEE IT
-        word_app.Activate()  
-        focus_word()         
-        
-        # Give your eyes a second to adjust to the screen
-        time.sleep(1.5)      
-
-        # 3. APPLY ALIGNMENT VIA ENGINE
-        selection = word_app.Selection
-        
-        # Word API Alignment values: 0 = Left, 1 = Center, 2 = Right, 3 = Justify
-        if align == "left":
-            selection.ParagraphFormat.Alignment = 0
-        elif align == "center":
-            selection.ParagraphFormat.Alignment = 1
-        elif align == "right":
-            selection.ParagraphFormat.Alignment = 2
-        elif align == "justify":
-            selection.ParagraphFormat.Alignment = 3
-            
-        print(f"✅ JARVIS: Text aligned {align}.")
-        
-    except Exception as e:
-        print(f"⚠️ API Failed, trying manual shortcut... Error: {e}")
-        # Manual Fallback just in case
-        if focus_word():
-            if align == "left": pyautogui.hotkey('ctrl', 'l')
-            elif align == "center": pyautogui.hotkey('ctrl', 'e')
-            elif align == "right": pyautogui.hotkey('ctrl', 'r')
-            elif align == "justify": pyautogui.hotkey('ctrl', 'j')
+    shortcuts = {
+        "left": "l",
+        "center": "e", # Note: 'e' for center
+        "right": "r",
+        "justify": "j"
+    }
+    
+    if align_type in shortcuts:
+        pyautogui.hotkey('ctrl', shortcuts[align_type])
+        print(f"✅ JARVIS: Text aligned to the {align_type}.")
 
 # -------- 9. HEADINGS --------
 def apply_heading(level):
@@ -231,7 +211,6 @@ def apply_style(style_type):
             pyautogui.hotkey('ctrl', key)
             print(f"✅ Style applied via Keyboard.")
 
-import keyboard
 
 # Add this color dictionary right above your specific style function
 word_colors = {
@@ -240,55 +219,45 @@ word_colors = {
 }
 
 # -------- 11. STYLE SPECIFIC (SMART ENGINE) --------
-def style_specific_text(target_text, style_type=None, color_name=None, font_size=None):
-    # 🛡️ Safety Guard: Don't try to style if no word was found
-    if not target_text or target_text == "None":
-        print("❌ JARVIS: No target word specified for styling.")
-        return
+def style_specific_text(target_text, style=None, color=None, size=None):
+    """
+    Portable Multi-Word Formatting: Loops through words using shortcuts.
+    """
+    if not target_text: return
     
-    print(f"🚀 JARVIS: Preparing to style '{target_text}'...")
-    try:
-        # 1. ATTEMPT TO CONNECT OR LAUNCH WORD
-        try:
-            word_app = win32com.client.GetActiveObject("Word.Application")
-        except:
-            print("📂 Word isn't open. Launching it via Engine...")
-            word_app = win32com.client.Dispatch("Word.Application") 
-            word_app.Visible = True
-            word_app.Documents.Add() 
-            time.sleep(2) 
-
-        # 2. BRING TO FRONT
-        focus_word()
-        doc = word_app.ActiveDocument
+    # If it's a single word string, turn it into a list for the loop
+    if isinstance(target_text, str):
+        target_text = [target_text]
         
-        # 3. THE ENGINE SEARCH
-        search_range = doc.Content
-        find = search_range.Find
-        find.ClearFormatting()
-        find.Text = target_text
-        
-        # 4. EXECUTE & APPLY ALL STYLES
-        if find.Execute():
-            # Apply Bold/Italic/Underline
-            if style_type == "bold": search_range.Font.Bold = True
-            elif style_type == "italic": search_range.Font.Italic = True
-            elif style_type == "underline": search_range.Font.Underline = 1
-            
-            # Apply Color
-            if color_name and color_name in word_colors:
-                search_range.Font.ColorIndex = word_colors[color_name]
-                
-            # Apply Size
-            if font_size:
-                search_range.Font.Size = font_size
-            
-            print(f"✅ JARVIS: Styled '{target_text}' successfully.")
-        else:
-            print(f"❌ JARVIS: I couldn't find the word '{target_text}' on the page.")
+    focus_word()
+    time.sleep(0.5)
 
-    except Exception as e:
-        print(f"❌ Error in Master Style Function: {e}")
+    for word in target_text:
+        print(f"🎨 JARVIS: Formatting '{word}'...")
+        
+        # 1. Open 'Find' tool
+        pyautogui.hotkey('ctrl', 'f')
+        time.sleep(0.6) # Slightly longer for stability
+        
+        # 2. Clear old search, type word, and Select
+        pyautogui.hotkey('ctrl', 'a')
+        pyautogui.press('backspace')
+        pyautogui.write(word, interval=0.05)
+        pyautogui.press('enter')
+        time.sleep(0.5)
+        
+        # 3. Escape to focus document
+        pyautogui.press('esc') 
+        time.sleep(0.3)
+
+        # 4. Apply Shortcut
+        if style == "bold": pyautogui.hotkey('ctrl', 'b')
+        elif style == "italic": pyautogui.hotkey('ctrl', 'i')
+        elif style == "underline": pyautogui.hotkey('ctrl', 'u')
+        
+        time.sleep(0.2) # Small pause between words
+
+    print(f"✅ JARVIS: Finished applying {style} to all requested words.")
         
 # ==========================================
 # 🧠 ADVANCED WORD FEATURES (From Notepad)

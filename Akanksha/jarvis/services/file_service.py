@@ -6,7 +6,8 @@ from .file_operations import (
     rename_file,
     move_file,
     copy_file,
-    read_file
+    read_file,
+    open_item
 )
 
 from .folder_operations import (
@@ -96,6 +97,10 @@ def handle_file_command(intent, entities):
         elif intent == "search_extension":
             directory = resolve_path(entities["directory"])
             return search_by_extension(directory, entities["extension"])
+        
+        elif intent == "open_item":
+            path = resolve_path(entities["path"])
+            return open_item(path)
 
         else:
             return {
