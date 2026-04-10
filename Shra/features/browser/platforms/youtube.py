@@ -3,8 +3,11 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
-from AIVA.Shra.features.browser.window_focus import bring_browser_to_front
-from AIVA.Shra.features.browser.memory.youtube_memory import YouTubeMemory
+from difflib import SequenceMatcher
+# from AIVA.Shra.features.browser.window_focus import bring_browser_to_front
+from features.browser.window_focus import bring_browser_to_front
+# from AIVA.Shra.features.browser.memory.youtube_memory import YouTubeMemory
+from features.browser.memory.youtube_memory import YouTubeMemory
 
 
 class YouTube:
@@ -13,6 +16,9 @@ class YouTube:
         self.driver = driver
         self.memory = YouTubeMemory()
         self.current_song = None
+
+    def _similarity(self, a, b):
+        return SequenceMatcher(None, a, b).ratio()
 
     # -------------------------------------------------
     # URL
@@ -170,7 +176,12 @@ class YouTube:
 
         search_box.clear()
         search_box.send_keys(query)
+
         search_box.submit()
+        # 🔥 LOAD MORE RESULTS (CRITICAL FIX)
+        for _ in range(3):
+            self.driver.execute_script("window.scrollBy(0, 1200);")
+            time.sleep(1.5)
 
         try:
             wait.until(
@@ -181,6 +192,8 @@ class YouTube:
             videos = WebDriverWait(self.driver, 10).until(
                 EC.presence_of_all_elements_located((By.XPATH, '//a[@id="video-title"]'))
             )
+            # 🔥 REFRESH ELEMENTS AFTER SCROLL
+            videos = self.driver.find_elements(By.XPATH, '//a[@id="video-title"]')
 
             selected_video = None
             query_lower = query.lower()
@@ -202,20 +215,47 @@ class YouTube:
                     continue
 
                 # 🔥 SCORE MATCHING
-                score = sum(1 for word in query_words if word in title_lower)
+                # 🔥 NEW FUZZY MATCHING
+                title_words = title_lower.split()
 
-                if score > best_score:
-                    best_score = score
+                # 🔥 compare with each word (fix typo issues)
+                word_scores = [self._similarity(query_lower, word) for word in title_words]
+
+                similarity = max(word_scores) if word_scores else 0
+
+                # 🔥 bonus: also compare full title
+                full_similarity = self._similarity(query_lower, title_lower)
+
+                # take best of both
+                final_score = max(similarity, full_similarity)
+
+                if final_score > best_score:
+                    best_score = final_score
+                    best_match = video
+
+                if similarity > best_score:
+                    best_score = similarity
                     best_match = video
 
             # final selection
             # 🔥 ONLY ACCEPT IF MATCH IS GOOD
-            if best_score >= max(1, len(query_words) // 2):
+            required_score = max(1, len(query_words) // 2)
+
+            # 🔥 FINAL SELECTION LOGIC (BEST PRACTICE)
+
+            SIMILARITY_THRESHOLD = 0.35  # you can tune (0.3–0.4)
+
+            if best_match and best_score >= SIMILARITY_THRESHOLD:
                 selected_video = best_match
             else:
-                selected_video = None
-            if not selected_video and videos:
-                selected_video = videos[0]
+                # 🔥 fallback → first video
+                selected_video = videos[0] if videos else None
+
+            if not selected_video:
+                return {
+                    "status": "error",
+                    "response": "No videos found."
+                }
 
             if selected_video:
                 self.driver.execute_script(
@@ -247,22 +287,7 @@ class YouTube:
                         self.driver.execute_script("arguments[0].click();", fresh_videos[0])
                 time.sleep(3)
 
-            else:
-                # 🔥 fallback: click FIRST RESULT AFTER FRESH SEARCH
-                if videos:
-                    self.driver.execute_script(
-                        "arguments[0].scrollIntoView({block: 'center'});",
-                        videos[0]
-                    )
-                    time.sleep(1)
 
-                    self.driver.execute_script("arguments[0].click();", videos[0])
-                    time.sleep(3)
-                else:
-                    return {
-                        "status": "error",
-                        "response": "No videos found."
-                    }
 
         except TimeoutException:
             return {
@@ -285,6 +310,270 @@ class YouTube:
             "status": "success",
             "response": f"Playing '{self.current_song}' on YouTube"
         }
+
+    def skip_ad(self):
+        try:
+            is_ad = self.driver.execute_script("""
+                const video = document.querySelector('video');
+                if (!video) return false;
+
+                // 🔥 ads usually have very small duration or changing src
+                return document.querySelector('.ad-showing') !== null 
+                       || document.querySelector('.ytp-ad-player-overlay') !== null
+                       || document.querySelector('.ytp-ad-text') !== null;
+            """)
+
+            if not is_ad:
+                return {
+                    "status": "info",
+                    "response": "No ad is currently playing."
+                }
+            time.sleep(3)  # 🔥 IMPORTANT FIX
+            # 🔥 TRY MULTIPLE METHODS
+            for _ in range(15):
+
+                # -------- METHOD 1: Selenium Click --------
+                try:
+                    skip_btn = WebDriverWait(self.driver, 3).until(
+                        EC.element_to_be_clickable((
+                            By.CSS_SELECTOR,
+                            ".ytp-ad-skip-button, .ytp-ad-skip-button-modern"
+                        ))
+                    )
+
+                    skip_btn.click()
+
+                    return {
+                        "status": "success",
+                        "response": "⏭️ Skipped the ad"
+                    }
+
+                except:
+                    pass
+
+                # -------- METHOD 2: JS FORCE CLICK --------
+                skipped = self.driver.execute_script("""
+                    let btn =
+                        document.querySelector('.ytp-ad-skip-button-modern') ||
+                        document.querySelector('.ytp-ad-skip-button') ||
+                        document.querySelector('.ytp-ad-skip-button-container button');
+
+                    if (btn) {
+
+                        // 🔥 CHECK IF BUTTON TEXT IS "Skip"
+                        let text = btn.innerText.toLowerCase();
+
+                        if (!text.includes("skip")) {
+                            return false;
+                        }
+
+                        btn.removeAttribute('disabled');
+
+                        btn.click();
+
+                        btn.dispatchEvent(new MouseEvent('click', {
+                            bubbles: true,
+                            cancelable: true
+                        }));
+
+                        return true;
+                    }
+
+                    return false;
+                """)
+                if skipped:
+                    return {
+                        "status": "success",
+                        "response": "⏭️ Skipped the ad"
+                    }
+
+                time.sleep(1)
+
+            return {
+                "status": "info",
+                "response": "⏳ Skip not available yet (long ad)."
+            }
+
+        except Exception as e:
+            return {
+                "status": "error",
+                "response": f"Skip failed: {str(e)}"
+            }
+    def mute(self):
+        try:
+            is_playing = self._is_playing()
+
+            if is_playing is None:
+                bring_browser_to_front()
+                time.sleep(1)
+                return {
+                    "status": "error",
+                    "response": "❌ No active YouTube video."
+                }
+
+            # 🔥 STEP 1: CHECK IF AD IS PLAYING
+            is_ad = self.driver.execute_script("""
+                return document.querySelector('.ytp-ad-player-overlay') !== null
+    || document.querySelector('.ytp-ad-text') !== null;
+            """)
+
+            # 🔥 STEP 2: IF AD → USE BUTTON (REAL USER ACTION)
+            if is_ad:
+                result = self.driver.execute_script("""
+                    const btn = document.querySelector('.ytp-mute-button');
+                    if (!btn) return "NO_BUTTON";
+
+                    let label = btn.getAttribute('aria-label')?.toLowerCase() || "";
+
+                    // 🔥 if already muted → don't click
+                    if (label.includes("unmute")) {
+                        return "ALREADY_MUTED";
+                    }
+
+                    // 🔥 otherwise click
+                    btn.click();
+                    return "MUTED";
+                """)
+
+                if result == "ALREADY_MUTED":
+                    return {"status": "info", "response": "Ad is already muted"}
+
+                if result == "MUTED":
+                    return {"status": "success", "response": "Muted ad"}
+
+
+                return {
+                    "status": "error",
+                    "response": "⚠️ Ad is playing. Could not mute."
+                }
+
+            # 🔥 STEP 3: NORMAL VIDEO → USE PROPERTY
+            # STEP 1: check already muted
+            # 🔥 ALWAYS USE BUTTON (REAL USER ACTION)
+            result = self.driver.execute_script("""
+                const video = document.querySelector('video');
+                const btn = document.querySelector('.ytp-mute-button');
+
+                if (!video || !btn) return "NO_VIDEO";
+
+                if (video.muted) {
+                    return "ALREADY_MUTED";
+                }
+
+                btn.click();
+                return "MUTED";
+            """)
+
+            if result == "ALREADY_MUTED":
+                return {"status": "info", "response": "YouTube is already muted"}
+
+            if result == "MUTED":
+                return {"status": "success", "response": "Muted YouTube"}
+
+
+
+        except:
+            return {"status": "error", "response": "Mute failed."}
+
+    def unmute(self):
+        try:
+            is_playing = self._is_playing()
+
+            if is_playing is None:
+                return {
+                    "status": "error",
+                    "response": "❌ No active YouTube video."
+                }
+
+            # 🔥 STEP 1: HANDLE AD FIRST
+            is_ad = self.driver.execute_script("""
+                return document.querySelector('.ytp-ad-player-overlay') !== null
+                    || document.querySelector('.ytp-ad-text') !== null;
+            """)
+
+            if is_ad:
+                result = self.driver.execute_script("""
+                    const btn = document.querySelector('.ytp-mute-button');
+                    if (!btn) return "NO_BUTTON";
+
+                    let label = btn.getAttribute('aria-label')?.toLowerCase() || "";
+
+                    // 🔥 already unmuted
+                    if (label.includes("mute") && !label.includes("unmute")) {
+                        return "ALREADY_UNMUTED";
+                    }
+
+                    btn.click();
+                    return "UNMUTED";
+                """)
+
+                if result == "ALREADY_UNMUTED":
+                    return {"status": "info", "response": "Ad is already unmuted"}
+
+                if result == "UNMUTED":
+                    return {"status": "success", "response": "Unmuted ad"}
+
+
+
+                return {
+                    "status": "error",
+                    "response": "⚠️ Could not unmute ad."
+                }
+
+            # 🔥 STEP 2: NORMAL VIDEO
+            result = self.driver.execute_script("""
+                const video = document.querySelector('video');
+                const btn = document.querySelector('.ytp-mute-button');
+
+                if (!video || !btn) return "NO_VIDEO";
+
+                if (!video.muted) {
+                    return "ALREADY_UNMUTED";
+                }
+
+                btn.click();
+                return "UNMUTED";
+            """)
+
+            if result == "ALREADY_UNMUTED":
+                return {"status": "info", "response": "YouTube is already unmuted"}
+
+            if result == "UNMUTED":
+                return {"status": "success", "response": "Unmuted YouTube"}
+
+            return {
+                "status": "error",
+                "response": "❌ Could not unmute YouTube."
+            }
+
+        except:
+            return {"status": "error", "response": "Unmute failed."}
+
+    def volume_up(self):
+        try:
+            self.driver.execute_script("""
+                const video = document.querySelector('video');
+                if (video) {
+                    video.volume = Math.min(1, video.volume + 0.2);
+                }
+            """)
+            return {"status": "success", "response": "Increased YouTube volume"}
+
+        except:
+            return {"status": "error", "response": "Could not increase volume"}
+
+    def volume_down(self):
+        try:
+            self.driver.execute_script("""
+                const video = document.querySelector('video');
+                if (video) {
+                    video.volume = Math.max(0, video.volume - 0.2);
+                }
+            """)
+            return {"status": "success", "response": "Decreased YouTube volume"}
+
+        except:
+            return {"status": "error", "response": "Could not decrease volume"}
 
     # -------------------------------------------------
     # PAUSE

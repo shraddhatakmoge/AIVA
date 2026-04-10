@@ -7,11 +7,8 @@ __pycache__/
 
 # Chrome automation profile
 features/browser/chrome_profile/
-features/browser/memory/
 
 # 🔐 Secrets (DO NOT UPLOAD)
-credentials.json
+
 token.pickle
 
-chrome_profile/
-Shra/features/tests/chrome_profile/

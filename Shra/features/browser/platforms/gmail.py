@@ -7,7 +7,8 @@ import pickle
 import os
 from email.mime.base import MIMEBase
 from email import encoders
-from AIVA.Shra.features.browser.window_focus import bring_browser_to_front
+# from AIVA.Shra.features.browser.window_focus import bring_browser_to_front
+from features.browser.window_focus import bring_browser_to_front
 
 class Gmail:
 

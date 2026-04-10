@@ -1,17 +1,32 @@
+# import os
+# import glob
+# from difflib import get_close_matches
+# import random
+# from pathlib import Path
+# from AIVA.Shra.features.browser.driver import DriverManager
+# from AIVA.Shra.features.browser.platforms.youtube import YouTube
+# from AIVA.Shra.features.browser.platforms.spotify import Spotify
+# from AIVA.Shra.features.browser.platforms.google import Google
+# from AIVA.Shra.features.browser.platforms.gmail import Gmail
+# from AIVA.Shra.features.browser.platforms.whatsapp import WhatsApp
+# from AIVA.Shra.features.browser.window_focus import bring_browser_to_front
+# from contacts import CONTACTS
+
 import os
 import glob
 from difflib import get_close_matches
 import random
 from pathlib import Path
-from AIVA.Shra.features.browser.driver import DriverManager
-from AIVA.Shra.features.browser.platforms.youtube import YouTube
-from AIVA.Shra.features.browser.platforms.spotify import Spotify
-from AIVA.Shra.features.browser.platforms.google import Google
-from AIVA.Shra.features.browser.platforms.gmail import Gmail
-from AIVA.Shra.features.browser.platforms.whatsapp import WhatsApp
-from AIVA.Shra.features.browser.window_focus import bring_browser_to_front
-from contacts import CONTACTS
 
+from .driver import DriverManager
+from .platforms.youtube import YouTube
+from .platforms.spotify import Spotify
+from .platforms.google import Google
+from .platforms.gmail import Gmail
+from .platforms.whatsapp import WhatsApp
+from .window_focus import bring_browser_to_front
+
+from ...contacts import CONTACTS
 
 class BrowserController:
 
@@ -252,6 +267,12 @@ class BrowserController:
 
         name = name.lower()
 
+        # 🔥 CLEAN EXTRA WORDS (CRITICAL FIX)
+        for word in ["website", "site", "tab", "page"]:
+            name = name.replace(word, "")
+
+        name = name.strip()
+
         for handle, meta in self.tab_metadata.items():
 
             # 🔥 MATCH PLATFORM (spotify, youtube etc.)
@@ -301,7 +322,7 @@ You can say:
     # HANDLE COMMAND
     # -------------------------------------------------
     def handle(self, structured):
-
+        control_actions = ["mute", "unmute", "volume_up", "volume_down", "pause", "resume"]
         # 🔥 HANDLE EMAIL CONTINUATION (CRITICAL FIX)
         if structured.get("action") == "continue_email" and self.pending_email:
 
@@ -564,6 +585,7 @@ You can say:
                     "response": f'✅ File selected: "{filename}"\n\n{self._build_email_preview()}\n\nDo you want to send the mail now? (yes/no)'
                 }
 
+
             # CONFIRMATION
             # CONFIRMATION
             if step == "confirm":
@@ -698,6 +720,7 @@ You can say:
 
 
 
+
         # MULTI ACTION SUPPORT
         if "actions" in structured:
             results = []
@@ -713,7 +736,42 @@ You can say:
         action = structured.get("action")
         query = structured.get("query")
 
-        # -------------------------------------------------
+
+        # 🔥 CONTROL COMMANDS — DO NOT START BROWSER
+        control_actions = ["mute", "unmute", "volume_up", "volume_down", "pause", "resume"]
+
+        if action == "skip_ad":
+            target = structured.get("target") or self.last_active_platform
+
+            if not target or target not in self.tabs:
+                return {
+                    "status": "error",
+                    "response": "❌ No active YouTube session."
+                }
+
+            platform = self.platform_instances.get(target)
+
+            return self._execute_platform_method(platform, "skip_ad", None)
+        if action in control_actions:
+
+            target = structured.get("target") or self.last_active_platform
+
+            if not target or target not in self.tabs:
+                return {
+                    "status": "error",
+                    "response": f"❌ No active {target or 'media'} session."
+                }
+
+            platform = self.platform_instances.get(target)
+
+            # 🔥🔥 CRITICAL FIX — SWITCH TAB FIRST
+            if target in self.tabs:
+                self._switch_to_tab(target)
+
+            return self._execute_platform_method(platform, action, query)
+
+
+            # -------------------------------------------------
         # 🔥 HANDLE PLATFORM REPLY (spotify / youtube)
         # -------------------------------------------------
         if self.pending_action:
@@ -815,6 +873,7 @@ You can say:
                 "status": "ask",
                 "response": "Please say Spotify or YouTube."
             }
+
         # -------------------------------------------------
         # 🔥 MOOD HANDLER (NEW FEATURE)
         # -------------------------------------------------
@@ -859,7 +918,8 @@ You can say:
                 })
         # 🔥 NEW SWITCH HANDLER
         if action == "switch_to_app":
-            target_name = structured.get("query")
+            target_name = str(structured.get("query")).lower()
+            target_name = target_name.replace("website", "").strip()
             return self.switch_to_tab_by_name(target_name)
 
         # 🔥 HANDLE NON-PLATFORM ACTIONS FIRST
@@ -883,8 +943,6 @@ You can say:
         # -------------------------------------------------
         if action == "add_to_favorites":
 
-
-
             target = self.last_active_platform
             platform = self.platform_instances.get(target)
 
@@ -894,14 +952,15 @@ You can say:
                     "response": "No active platform."
                 }
 
-            # 🔥 USE CURRENT SONG INSTEAD OF QUERY
-            if hasattr(platform, "current_song") and platform.current_song:
-                return platform.memory.add_favorite(platform.current_song)
+            # ✅ CALL PLATFORM METHOD (BEST PRACTICE)
+            if hasattr(platform, "add_to_favorites"):
+                return platform.add_to_favorites()
 
             return {
                 "status": "error",
-                "response": "No song is currently playing."
+                "response": "This platform does not support favorites."
             }
+
 
         # -------------------------------------------------
         # 🔥 FIX: REMOVE FROM FAVORITES (CRITICAL FIX)
@@ -918,8 +977,9 @@ You can say:
                 }
 
             # 🔥 USE CURRENT SONG INSTEAD OF QUERY
-            if hasattr(platform, "current_song") and platform.current_song:
-                return platform.memory.remove_favorite(platform.current_song)
+            # ✅ CALL PLATFORM METHOD (CLEAN DESIGN)
+            if hasattr(platform, "remove_favorite"):
+                return platform.remove_favorite()
 
             return {
                 "status": "error",
@@ -994,7 +1054,7 @@ You can say:
         original_command = structured.get("original_command", "").lower()
 
         # 🔥 ONLY FORCE TARGET FOR EXPLICIT COMMANDS
-        if action in ["play", "open", "search"]:
+        if action in ["play", "play_music", "open", "search"]:
             if "youtube" in original_command or "yt" in original_command:
                 structured["target"] = "youtube"
 
@@ -1005,6 +1065,24 @@ You can say:
         target = self._detect_target(structured)
         structured["target"] = target
         # 🔥 FORCE GOOGLE TAB FOR SEARCH (CORRECT POSITION)
+        # 🔥 HANDLE OPEN RESULT BY NAME (CRITICAL FIX)
+        print("🔥 FINAL ACTION:", action)
+        print("🔥 FINAL QUERY:", query)
+        if action == "open_result_by_name":
+
+            self._ensure_driver()
+
+            if "google" in self.tabs:
+                self._switch_to_tab("google")
+            else:
+                self._open_new_tab("google")
+
+            platform = self.platform_instances["google"]
+
+            name = query.get("name")
+            index = query.get("index", 1)
+
+            return platform.open_result_by_name(name, index)
         if action == "search" and target == "google":
 
             self._ensure_driver()
@@ -1044,7 +1122,7 @@ You can say:
             query_data = structured.get("query", {})
             to = query_data.get("to")
 
-            from contacts import CONTACTS
+
 
             if to:
                 to_clean = to.strip().lower()
@@ -1079,18 +1157,15 @@ You can say:
                 "response": "What should be the subject?"
             }
 
-        # GMAIL OPEN
-
-
-        # NORMAL FLOW
-        self._ensure_driver()
-
+        # 🔥 ENSURE DRIVER ONLY WHEN NEEDED
         if target not in self.platform_instances:
-            return {
-                "status": "error",
-                "response": f"Platform '{target}' not supported"
-            }
+            self._ensure_driver()
 
+            if target not in self.platform_instances:
+                return {
+                    "status": "error",
+                    "response": f"Platform '{target}' not supported"
+                }
         action = self._normalize_action(action)
         platform = self.platform_instances[target]
 
@@ -1147,10 +1222,13 @@ You can say:
 
         # AUTO OPEN
         just_opened = False
-        if action != "open" and target not in self.tabs:
+
+        # 🔥 ONLY AUTO-OPEN FOR PLAY / SEARCH / OPEN
+        auto_open_actions = ["play", "play_music", "search", "open"]
+
+        if action in auto_open_actions and target not in self.tabs:
             open_result = self._open_new_tab(target)
             just_opened = True
-
             if open_result.get("status") not in ["success", "login_required"]:
                 return open_result
         else:
