@@ -608,4 +608,4 @@ def process_notepad_command(cmd):
     else:
         return False
 
-    return True 
+    return True

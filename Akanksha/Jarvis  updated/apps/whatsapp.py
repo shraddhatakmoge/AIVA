@@ -605,4 +605,3 @@ def show_unread_messages():
     pyautogui.press("right") 
     time.sleep(0.2)
     pyautogui.press("enter")       # Toggle the filter ON
-    
