@@ -28,27 +28,30 @@ def focus_spotify():
 
 # ---------------- OPEN ----------------
 def open_spotify():
-    standard_path = os.path.expanduser("~\\AppData\\Roaming\\Spotify\\Spotify.exe")
-    store_path = os.path.expanduser("~\\AppData\\Local\\Microsoft\\WindowsApps\\Spotify.exe")
+    """
+    Universal Open: Uses Windows URI to launch Spotify without hardcoded paths.
+    """
+    print("🚀 JARVIS: Attempting to launch Spotify...")
     
-    # 1. Try Direct App Paths First
-    if os.path.exists(standard_path):
-        subprocess.Popen(standard_path)
-    elif os.path.exists(store_path):
-        subprocess.Popen(store_path)
-    else:
-        # 2. Try URI Scheme
-        os.system("start spotify:")
-        time.sleep(2)
-        
-        # 3. Final Fallback: Keyboard Search
+    # 1. THE UNIVERSAL WAY: URI Scheme works for all installations
+    # This replaces looking for specific AppData folders.
+    os.system("start spotify:") 
+    
+    # 2. WAIT FOR INITIALIZATION
+    # Give it 4 seconds—essential for slower laptops to load the UI.
+    time.sleep(4) 
+    
+    # 3. FOCUS VERIFICATION
+    # Use your existing focus function to ensure it's at the front.
+    if not focus_spotify():
+        # Fallback: If URI failed, use the Start Menu search
         pyautogui.press("win")
         time.sleep(0.5)
-        pyautogui.write("spotify", interval=0.05) 
-        time.sleep(0.5)
+        pyautogui.write("spotify", interval=0.05)
+        time.sleep(0.8)
         pyautogui.press("enter")
-        
-    # Only print one single message at the very end!
+    
+    # Only one message at the end
     print("✅ Spotify opened")
 
 # ---------------- CLOSE ----------------
@@ -74,13 +77,16 @@ def play_song(song):
     
 # --------- SEARCH SONG ---------
 def search_song(song):
-    pyautogui.hotkey("ctrl", "l")
+    # 🔥 THE FIX: Strip 'on spotify' from the query before typing
+    clean_query = song.lower().replace("on spotify", "").strip()
+    
+    pyautogui.hotkey("ctrl", "l") # Standard shortcut to focus search
     time.sleep(1)
 
     pyautogui.hotkey("ctrl", "a")
     pyautogui.press("backspace")
 
-    pyautogui.write(song, interval=0.07)
+    pyautogui.write(clean_query, interval=0.07)
     time.sleep(1)
 
     pyautogui.press("enter")
@@ -123,37 +129,28 @@ def previous_track():
     print("⏮️ Previous song")
     
 def like_song():
-  
+    """
+    Robust Portable Version: Forces a 'Physical' key hold instead of coordinates.
+    """
+    print("⏳ JARVIS: Attempting to like current track...")
+    
+    # Use your existing focus function to bring Spotify to the front
+    if not focus_spotify():
+        # Use your portable open function if it's not open
+        open_spotify()
+        time.sleep(2)
+        focus_spotify()
 
-    # 🔥 Step 1: Open Spotify
-    os.system("start shell:AppsFolder\\SpotifyAB.SpotifyMusic_zpdnekdrzrea0!Spotify")
-    time.sleep(5)
+    # Give Windows a moment to stabilize focus
+    time.sleep(1)
 
-    # 🔥 Step 2: Focus Spotify window
-    windows = gw.getWindowsWithTitle("Spotify")
-    if windows:
-        try:
-            win = windows[0]
-
-            if win.isMinimized:
-                win.restore()
-                time.sleep(1)
-
-            win.activate()
-            time.sleep(1)
-
-        except:
-            print("⚠️ Could not focus Spotify")
-
-    # 🔥 Step 3: Move to heart button
-    x, y = 1854, 839   # your coordinates
-
-    pyautogui.moveTo(x, y, duration=0.3)
-    time.sleep(0.5)
-
-    # 🔥 Step 4: Click (double for safety)
-    pyautogui.click()
+    # 🔥 THE ROBUST SEQUENCE: Manually holding keys
+    # This replaces the need for x, y = 1854, 839
+    pyautogui.keyDown('alt')
+    pyautogui.keyDown('shift')
+    pyautogui.press('b')
     time.sleep(0.2)
-    pyautogui.click()
-
-    print("✅ Song added to Liked Songs")
+    pyautogui.keyUp('shift')
+    pyautogui.keyUp('alt')
+    
+    print("✅ JARVIS: Song added to Liked Songs using Alt+Shift+B")

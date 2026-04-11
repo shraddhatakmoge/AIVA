@@ -189,18 +189,15 @@ def replace_word(old, new):
 
         print(f"✅ Replaced '{old}' with '{new}'")
                 
-# -------- DELETE WORD (PRESERVES NEWLINES) ------
+# -------- DELETE WORD / PHRASE --------
 def delete_word(word):
     win = focus_notepad()
     if win:
         click_inside_notepad(win)
         time.sleep(0.5)
 
-        # Clear clipboard (important)
         pyperclip.copy("")
         time.sleep(0.2)
-
-        # Copy all text
         pyautogui.hotkey("ctrl", "a")
         time.sleep(0.3)
         pyautogui.hotkey("ctrl", "c")
@@ -213,40 +210,25 @@ def delete_word(word):
             speak("There is no text")
             return
 
-        # 🔥 THE FIX: Process the document line-by-line to protect your paragraphs
-        lines = text.split('\n')
-        new_lines = []
-        
-        for line in lines:
-            # Split only the words on this specific line
-            words = line.split() 
-            # Filter out the target word
-            words = [w for w in words if w.lower() != word.lower()]
-            # Rejoin the line
-            new_lines.append(" ".join(words))
+        # 🔥 THE FIX: Use regex to find the exact phrase (case-insensitive) and remove it!
+        import re
+        # This replaces the phrase with nothing, and cleans up any double spaces left behind
+        new_text = re.sub(r'(?i)\b' + re.escape(word) + r'\b', '', text)
+        new_text = re.sub(' +', ' ', new_text) 
 
-        # Glue the document back together using newlines (\n) instead of spaces
-        new_text = "\n".join(new_lines)
-
-        # Put updated text back
         pyperclip.copy(new_text)
         time.sleep(0.2)
-
-        pyautogui.hotkey("ctrl", "a")
-        time.sleep(0.3)
         pyautogui.hotkey("ctrl", "v")
-        
-        # 🔥 THE FIX (Part 2): Move cursor to the bottom so the screen doesn't jump to the top
         time.sleep(0.2)
         pyautogui.hotkey("ctrl", "end")
 
-        print(f"✅ Deleted word '{word}'")
+        print(f"✅ Deleted '{word}'")
 
 # --------- NEW LINE --------
 def new_line():
     win = focus_notepad()
     if win:
-        click_inside_notepad(win)
+       
         pyautogui.press("enter")
         print("New line added")
 
@@ -366,7 +348,6 @@ def move_cursor(direction):
 def new_paragraph():
     win = focus_notepad()
     if win:
-        click_inside_notepad(win)
         pyautogui.press("enter")
         pyautogui.press("enter")
         print("New paragraph added")
@@ -474,12 +455,45 @@ def clear_notepad():
         print("✅ Notepad cleared")
 
 
-# -------- DELETE LINE --------
-def delete_line():
+# -------- DELETE SPECIFIC LINE --------
+def delete_specific_line(line_number):
     win = focus_notepad()
-    if win:
-        pyautogui.hotkey("ctrl", "a")
-        pyautogui.press("delete")
+    if not win:
+        return
+
+    click_inside_notepad(win)
+    time.sleep(0.2)
+
+    pyperclip.copy("EMPTY_MARKER")
+    pyautogui.hotkey("ctrl", "a")
+    time.sleep(0.2)
+    pyautogui.hotkey("ctrl", "c")
+    time.sleep(0.4)
+
+    text = pyperclip.paste()
+
+    if text == "EMPTY_MARKER" or not text.strip():
+        return
+
+    # Split document into a list of lines
+    lines = text.replace('\r', '').split("\n")
+    
+    if 0 < line_number <= len(lines):
+        # 🔥 THE FIX: Remove the exact line from the list
+        lines.pop(line_number - 1)
+        
+        # Put the document back together
+        new_text = "\n".join(lines)
+
+        pyperclip.copy(new_text)
+        time.sleep(0.2)
+        pyautogui.hotkey("ctrl", "v")
+        time.sleep(0.2)
+        pyautogui.hotkey("ctrl", "end")
+        
+        print(f"✅ Deleted line {line_number}")
+    else:
+        print(f"❌ Invalid line. Document only has {len(lines)} lines.")
         
 # ----- PRESS SPACE -----
 def press_space():
@@ -600,7 +614,7 @@ def process_notepad_command(cmd):
         redo_action()
         
     elif "delete line" in cmd:
-        delete_line()
+        delete_specific_line()
 
     else:
         return False

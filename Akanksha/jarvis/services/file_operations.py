@@ -110,3 +110,29 @@ def read_file(path):
             "message": str(e),
             "data": None
         }
+
+def open_item(path):
+    try:
+        # Check if it actually exists first so JARVIS doesn't crash
+        if not os.path.exists(path):
+            return {
+                "status": "error",
+                "message": f"Could not find anything at {path}",
+                "data": None
+            }
+
+        # os.startfile is the universal Windows command to open a file/folder
+        os.startfile(path)
+        
+        return {
+            "status": "success",
+            "message": f"Opened successfully: {path}",
+            "data": None
+        }
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"System error while trying to open: {str(e)}",
+            "data": None
+        }

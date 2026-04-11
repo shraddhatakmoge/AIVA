@@ -18,29 +18,37 @@ def focus_pp():
 
 # -------- OPEN --------
 def open_powerpoint():
-    
-    if focus_pp():
-        print("✅ JARVIS: PowerPoint is already open.")
-        return
-    
-    
-    os.startfile("powerpnt")
-    time.sleep(5)
-    pyautogui.press('enter') # Bypass the 'Blank Presentation' screen
-
-# -------- ADD SLIDE --------
-def add_slide(layout_index=1):
-    focus_pp()
-    """Layout 1 is usually 'Title and Content'"""
+    """
+    Universal Launch: Uses the official executable name 'powerpnt'.
+    """
+    print("🚀 JARVIS: Opening Microsoft PowerPoint...")
     try:
-        pp_app = win32com.client.GetActiveObject("PowerPoint.Application")
-        presentation = pp_app.ActivePresentation
-        # Add a new slide at the end
-        slide_count = presentation.Slides.Count
-        new_slide = presentation.Slides.Add(slide_count + 1, layout_index)
-        print(f"✅ JARVIS: Added slide {slide_count + 1}")
+        # 'powerpnt' is the universal command for all versions of PP
+        os.startfile("powerpnt") 
+        
+        # 🔥 THE FIX: Wait for the Template Gallery to load
+        time.sleep(6) 
+        
+        # Press Enter to select 'Blank Presentation'
+        pyautogui.press('enter')
+        print("✅ PowerPoint is ready.")
     except Exception as e:
-        print(f"❌ Error adding slide: {e}")
+        print(f"❌ Error opening PowerPoint: {e}")
+
+def add_slide():
+    """
+    Universal Add Slide: Uses Ctrl+M shortcut.
+    """
+    if focus_pp():
+        # Give a small pause to ensure focus is stable
+        time.sleep(0.5)
+        # Ctrl + M is the global shortcut for a new slide
+        pyautogui.hotkey('ctrl', 'm')
+        print("✅ JARVIS: New slide added.")
+    else:
+        print("❌ PowerPoint not found. Opening it now...")
+        open_powerpoint()
+
 
 # -------- SET TITLE --------
 def set_slide_title(text):

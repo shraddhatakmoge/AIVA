@@ -118,6 +118,12 @@ def execute_action(data, original_command=""):
             else:
                 # 🔥 Make sure this matches the function name in notepad.py
                 delete_word(text)
+                
+        # 🔥 ADD THIS NEW BLOCK RIGHT BELOW DELETE
+        elif action == "delete_line":
+            if line:
+                # Ensure you import delete_specific_line at the top of main(brain).py!
+                delete_specific_line(line) 
 
         elif action == "read":
             # 1. Try to find any window with "Notepad" in the title
@@ -146,7 +152,7 @@ def execute_action(data, original_command=""):
         elif action == "replace":
             old_word = data.get("old_text")
             new_word = data.get("new_text")
-            
+                
             if old_word and new_word:
                 # This calls the fast clipboard function we just wrote in notepad.py!
                 replace_word(old_word, new_word)
@@ -268,14 +274,15 @@ def execute_action(data, original_command=""):
             file_name = data.get("text")
             location = data.get("folder")
             
-            print(f"🔍 JARVIS: Searching for '{file_name}'...")
-            # Use your smart search tool from common.py!
+            # Use the smart search tool
             real_file_path = find_document(file_name, specific_location=location)
             
             if real_file_path:
-                open_existing_word_file(real_file_path)
+                # Use os.startfile for a 100% portable launch
+                os.startfile(real_file_path)
+                print(f"✅ JARVIS: Opening {file_name}.")
             else:
-                print(f"❌ JARVIS: Could not find a file named '{file_name}'.")
+                print(f"❌ JARVIS: Could not find '{file_name}' on this computer.")
 
         elif action == "close":
             close_word()
@@ -405,7 +412,7 @@ def execute_action(data, original_command=""):
             return True
         
         elif action == "play":
-            play_song(text)
+            play_song(text) # text will be the playlist name from our query_map
             return True
 
         elif action == "pause":
@@ -463,6 +470,21 @@ def is_nlp_confident(data):
 
 
 # ==============================
+# ✅ NLP RESULT VALIDATOR
+# ==============================
+def is_nlp_confident(data):
+    action = data.get("action")
+    intent = data.get("intent") # 🔥 Listen for File System intents
+
+    # If BOTH are None, the NLP failed to understand the command
+    if action is None and intent is None:
+        print("   🔍 DEBUG: Action/Intent is None. NLP is NOT confident. Sending to LLM...")
+        return False
+        
+    print(f"   🔍 DEBUG: Action/Intent found. NLP IS confident. Executing locally...")
+    return True
+
+# ==============================
 # 🚀 MAIN COMMAND PROCESSOR
 # ==============================
 import re
@@ -472,44 +494,32 @@ CURRENT_APP_STATE = "notepad"
 
 def process_command(command):
     global CURRENT_APP_STATE
-    
-    # Standardize input
     command = command.lower().strip()
 
-    parts = re.split(r'\b(?:and then|then)\b', command)
+    # Split "and then" commands
+    parts = re.split(r'\b(?:and then|then|and)\b', command)
     
     for part in parts:
-        part = part.strip().strip(',').strip('.') 
+        part = part.strip()
         if not part: continue
         
-        
-        # 1. 👁️ LOOK AT THE SCREEN: Is the user physically looking at Word or Notepad?
+        # 1. Sync state with active window
         on_screen = get_active_app()
         if on_screen:
             CURRENT_APP_STATE = on_screen
             
-        # 2. 🧠 PASS THE MEMORY TO NLP
-        # This tells the brain: "Hey, we are currently focused on [Word]!"
+        # 2. Try Local NLP
         nlp_data = process_nlp(part, CURRENT_APP_STATE) 
-        
         print("📊 NLP RESULT:", nlp_data)   
         
-        # 3. 💾 UPDATE MEMORY IF APP CHANGED
-        # If the user explicitly said "open notepad", update the memory!
-        if nlp_data.get("app"):
-            CURRENT_APP_STATE = nlp_data["app"]
-
-        # Validate and Execute
-        # Validate and Execute
-        if is_nlp_confident(nlp_data):
-            # If it's a specific app command (WhatsApp, PowerPoint, etc.)
+        # 3. Decision Logic
+        confident = is_nlp_confident(nlp_data)
+        
+        if confident == True:
+            if nlp_data.get("app"):
+                CURRENT_APP_STATE = nlp_data["app"]
             execute_action(nlp_data, part)
             time.sleep(0.5)
-        # else:
-        #     # 🔥 THE TRUE AI UPGRADE 🔥
-        #     # If the NLP doesn't recognize the command, route it to Gemini!
-        #     ask_jarvis_llm(part)
-            
 # ==============================
 # ▶️ RUN
 # ==============================
