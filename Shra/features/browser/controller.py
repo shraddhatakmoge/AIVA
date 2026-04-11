@@ -26,7 +26,7 @@ from .platforms.gmail import Gmail
 from .platforms.whatsapp import WhatsApp
 from .window_focus import bring_browser_to_front
 
-from contacts import CONTACTS
+from .contacts import CONTACTS
 
 class BrowserController:
 
