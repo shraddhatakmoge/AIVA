@@ -23,7 +23,26 @@ def speak(text):
 
 # -------- OPEN --------
 def open_whatsapp():
-    os.system("start shell:AppsFolder\\5319275A.WhatsAppDesktop_cv1g1gvanyjgm!App")
+    print("🚀 JARVIS: Attempting to launch WhatsApp...")
+    
+    # 1. Build the dynamic paths where the .exe is typically installed
+    local_appdata = os.environ.get("LOCALAPPDATA", "")
+    program_files = os.environ.get("PROGRAMFILES", "")
+    
+    exe_path_local = os.path.join(local_appdata, "WhatsApp", "WhatsApp.exe")
+    exe_path_prog = os.path.join(program_files, "WhatsApp", "WhatsApp.exe")
+    
+    # 2. Check for the .exe version first
+    if os.path.exists(exe_path_local):
+        os.startfile(exe_path_local)
+        
+    elif os.path.exists(exe_path_prog):
+        os.startfile(exe_path_prog)
+        
+    else:
+        # 3. Fallback to your original Microsoft Store App version
+        os.system("start shell:AppsFolder\\5319275A.WhatsAppDesktop_cv1g1gvanyjgm!App")
+        
     time.sleep(3)
 
 
