@@ -93,7 +93,7 @@ def process_nlp(command, current_app="notepad"):
     # =========================================
     # 📊 POWERPOINT LOGIC
     # =========================================
-    powerpoint_keywords = ["powerpoint", "presentation", "slide", "title", "content", "subtitle", "show", "slideshow", "present", "theme", "design"]
+    powerpoint_keywords = ["powerpoint", "presentation", "slide", "title", "content", "subtitle", "slideshow", "present", "theme", "design"]
     
     # 🔥 THE FIX: Only enter this block if it's explicitly PowerPoint
     # We removed "next" and "previous" from the keywords list above to prevent stealing
@@ -126,7 +126,7 @@ def process_nlp(command, current_app="notepad"):
         elif any(x in cmd for x in ["stop", "exit", "end"]) and "slideshow" in cmd:
             result["action"] = "stop_slideshow"
             return result
-        elif any(x in cmd for x in ["go to", "show"]):
+        elif "go to slide" in cmd or "show slide" in cmd:
             result["action"] = "navigate"
             match = re.search(r"slide\s+(\d+)", cmd)
             result["text"] = match.group(1) if match else None
@@ -307,10 +307,11 @@ def process_nlp(command, current_app="notepad"):
     match_ins_line = re.search(r"(?:insert|add|put|squeeze) (.*?) (?:at|on|in|into) line (\d+)", cmd)
     if match_ins_line:
         return {"app": result["app"] or "notepad", "action": "insert", "text": match_ins_line.group(1).strip(), "line": int(match_ins_line.group(2))}
-    elif "insert" in cmd or "add" in cmd:
-        text = cmd.replace("insert", "").replace("add", "").strip()
+    elif re.search(r'\b(?:insert|add)\b', cmd):
+        # Use re.sub to safely remove the standalone word "insert" or "add"
+        text = re.sub(r'\b(?:insert|add)\b', '', cmd).strip()
         return {"app": result["app"] or "notepad", "action": "insert", "text": text}
-
+    
     # 6. FORMATTING / MOVEMENT
     if "undo" in cmd: return {"app": result["app"] or "notepad", "action": "undo"}
     elif "redo" in cmd: return {"app": result["app"] or "notepad", "action": "redo"}
@@ -324,7 +325,7 @@ def process_nlp(command, current_app="notepad"):
     # 7. UTILITY
     if "clear" in cmd or "empty" in cmd: return {"app": result["app"] or "notepad", "action": "clear"}
     elif "new file" in cmd or "create file" in cmd: return {"app": result["app"] or "notepad", "action": "new"}
-    elif "read" in cmd: return {"app": result["app"] or "notepad", "action": "read"}
+    elif "read" in cmd and "unread" not in cmd and "message" not in cmd: return {"app": result["app"] or "notepad", "action": "read"}
     
     # =========================================
     # 💬 SPOTIFY
@@ -406,6 +407,11 @@ def process_nlp(command, current_app="notepad"):
     # =========================================
     if "open whatsapp" in cmd: return {"app": "whatsapp", "action": "open"}
     elif "close whatsapp" in cmd: return {"app": "whatsapp", "action": "close"}
+    elif "read message from" in cmd or "read messages from" in cmd:
+        contact_name = cmd.split("from")[-1].strip()
+        return {"app": "whatsapp", "action": "read_specific", "contact": contact_name}
+    elif "show unread" in cmd or "see unread" in cmd: 
+        return {"app": "whatsapp", "action": "show_unread"}
     elif "voice message" in cmd or "voice note" in cmd:
         match = re.search(r"voice (?:message|note)(?: to)? (.+)", cmd)
         return {"app": "whatsapp", "action": "voice_note", "contact": match.group(1).strip() if match else None}   
@@ -440,8 +446,7 @@ def process_nlp(command, current_app="notepad"):
             clean_file = spoken_file.replace("file ", "").replace("attachment ", "").replace("document ", "").strip()
             return {"app": "whatsapp", "action": "send_attachment", "contact": contact.strip(), "file_name": clean_file, "location": location}
         except: pass
-    elif "read last message sent by" in cmd: return {"app": "whatsapp", "action": "read_from_contact", "contact": cmd.split("by")[-1].strip()}
-
+    
   
     # =========================================
     # 📂 STEP 2: FILE SYSTEM (PRIORITY OVERRIDE)

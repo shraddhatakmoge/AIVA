@@ -9,11 +9,6 @@ import pyperclip
 import pyttsx3
 engine = pyttsx3.init()
 
-def speak(text):
-    engine.say(text)
-    engine.runAndWait()
-
-
 
 
 # -------- FOCUS WORD --------
@@ -280,10 +275,10 @@ def read_word():
         clean_text = text.replace('\r', '\n').strip()
         
         if not clean_text:
-            speak("There is no text.")
+          
             return
 
-        speak(clean_text)
+      
     except Exception as e:
         print(f"❌ Error: {e}")
 

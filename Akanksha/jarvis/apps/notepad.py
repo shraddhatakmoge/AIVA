@@ -9,9 +9,7 @@ from common import open_system_app, close_app
 
 engine = pyttsx3.init()
 
-def speak(text):
-    engine.say(text)
-    engine.runAndWait()
+
     
     
 pyautogui.FAILSAFE = False
@@ -31,14 +29,12 @@ def open_notepad():
             if win.isMinimized:
                 win.restore()
             win.activate()
-            print("✅ JARVIS: Notepad is already open. Brought to front!")
             return win # Success! Stop here.
         except:
             # It was a ghost window, ignore it and keep looking
             continue 
             
     # 2. If we get here, there are no valid windows. Let's open one!
-    print("🚀 JARVIS: Opening a fresh Notepad...")
     os.system("start notepad")
     time.sleep(2)
     
@@ -139,22 +135,17 @@ def read_notepad():
 
         if visible_text == "":
             print("There is no text")
-            speak("There is no text")
             return
 
         print("\n--- Notepad Content ---\n")
         print(text)
 
-        # 🔊 Speak content
-        for line in text.splitlines():
-            if line.strip():
-                speak(line)
+       
             
 # -------- REPLACE WORD --------
 def replace_word(old, new):
     win = focus_notepad()
     if win:
-        speak(f"Replacing {old} with {new}")
         click_inside_notepad(win)
         time.sleep(0.5)
 
@@ -172,7 +163,6 @@ def replace_word(old, new):
 
         if not text.strip():
             print("❌ There is no text")
-            speak("There is no text")
             return
 
         # Replace text natively in Python
@@ -207,7 +197,6 @@ def delete_word(word):
 
         if not text.strip():
             print("There is no text")
-            speak("There is no text")
             return
 
         # 🔥 THE FIX: Use regex to find the exact phrase (case-insensitive) and remove it!

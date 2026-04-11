@@ -241,7 +241,16 @@ def execute_action(data, original_command=""):
                 # Make sure send_contact_card is imported at the top of the file!
                 send_contact_card(exact_target, exact_share_name)
                     
-
+        elif action == "read_specific":
+            # Ensure you import read_specific_message at the top of main!
+            if contact:
+                # Use your existing resolver to clean up the spoken name
+                exact_name = resolve_contact(contact)
+                read_specific_message(exact_name)
+                
+        elif action == "show_unread":
+            show_unread_messages()
+            
         return True
 
     # ==============================
@@ -292,6 +301,7 @@ def execute_action(data, original_command=""):
             write_in_word(text)
         elif action == "save":
             folder = data.get("folder")
+            
             save_word_file(text, folder)
         elif action == "style":
             apply_style(data.get("style"))
@@ -481,7 +491,7 @@ def is_nlp_confident(data):
         print("   🔍 DEBUG: Action/Intent is None. NLP is NOT confident. Sending to LLM...")
         return False
         
-    print(f"   🔍 DEBUG: Action/Intent found. NLP IS confident. Executing locally...")
+    # print(f"   🔍 DEBUG: Action/Intent found. NLP IS confident. Executing locally...")
     return True
 
 # ==============================

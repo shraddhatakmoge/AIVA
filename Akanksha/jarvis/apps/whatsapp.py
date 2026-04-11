@@ -14,10 +14,7 @@ last_message = ""
 engine = pyttsx3.init()
 STOP_RECORDING = False  #
 
-def speak(text):
-    print("🔊", text)
-    engine.say(text)
-    engine.runAndWait()
+
 
 
 
@@ -154,7 +151,6 @@ def send_screenshot(contact):
 
     if not path:
         print("❌ No screenshot found")
-        speak("No screenshot found")
         return
 
     print("📸 Sending:", path)
@@ -535,3 +531,78 @@ def send_contact_card(target_person, contact_to_share):
    
     
     print(f"✅ Contact card for '{contact_to_share}' sent to {target_person}")
+    
+# -------- READ LATEST MESSAGE FROM SPECIFIC PERSON --------
+def read_specific_message(contact):
+    focus_whatsapp()
+    time.sleep(1)
+
+    # 1. Clear UI state
+    for _ in range(3):
+        pyautogui.press("esc")
+        time.sleep(0.3)
+
+    # 2. Search for the exact person
+    pyautogui.hotkey("ctrl", "f")
+    time.sleep(0.5)
+    pyautogui.hotkey("ctrl", "a")
+    pyautogui.press("backspace")
+    pyautogui.write(contact, interval=0.05)
+    time.sleep(2.5) # Wait for search results to load
+
+    # 3. Open their chat
+    pyautogui.press("down")
+    time.sleep(0.2)
+    pyautogui.press("enter")
+    time.sleep(1.5) # Wait for chat to open
+
+   # 4. Copy the last message
+    pyperclip.copy("EMPTY_MARKER")
+    
+    # 🎯 THE REAL FIX: It usually takes 3 or 4 Shift+Tabs to bypass the 
+    # Emoji and Attach buttons to finally reach the message history.
+    for _ in range(3):
+        pyautogui.hotkey("shift", "tab") 
+        time.sleep(0.2)
+    
+    pyautogui.press("right")
+    pyautogui.press("enter")
+    pyautogui.press("down")
+    pyautogui.press("enter")
+
+
+    text = pyperclip.paste()
+
+    # 5. Output the result
+    if text == "EMPTY_MARKER" or not text.strip():
+        print(f"📭 JARVIS: Could not read a message from {contact}.")
+        # speak(f"Could not read a message from {contact}.")
+        return
+
+    print(f"📩 JARVIS: Message from {contact}: {text}")
+    # speak(f"Message from {contact} says: {text}")
+    
+    # Return focus to the typing box to reset the UI state
+    # Since we went backwards 4 times, we go forward 4 times
+    for _ in range(4):
+        pyautogui.press("tab")
+        time.sleep(0.1)
+        
+# -------- SHOW UNREAD MESSAGES (FILTER ONLY) --------
+def show_unread_messages():
+    focus_whatsapp()
+    time.sleep(1)
+
+    # 1. Clear any active search or open chat
+    for _ in range(3):
+        pyautogui.press("esc")
+        time.sleep(0.3)
+    
+    # 2. Toggle the Unread Filter ON
+    pyautogui.hotkey("ctrl", "f")  # Jump to Search Box
+    time.sleep(0.5)
+    pyautogui.press("tab")         # Tab over to the 'Unread Filter' icon next to it
+    pyautogui.press("right") 
+    time.sleep(0.2)
+    pyautogui.press("enter")       # Toggle the filter ON
+    
