@@ -526,10 +526,6 @@ def send_contact_card(target_person, contact_to_share):
     pyautogui.press("tab")
     pyautogui.press("enter")
     
-
-    
-   
-    
     print(f"✅ Contact card for '{contact_to_share}' sent to {target_person}")
     
 # -------- READ LATEST MESSAGE FROM SPECIFIC PERSON --------
