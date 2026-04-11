@@ -12,15 +12,10 @@ pyautogui.FAILSAFE = False
 
 last_message = ""
 engine = pyttsx3.init()
-STOP_RECORDING = False  #
-
-
-
-
+STOP_RECORDING = False  
 
 # -------- OPEN --------
 def open_whatsapp():
-    print("🚀 JARVIS: Attempting to launch WhatsApp...")
     
     # 1. Build the dynamic paths where the .exe is typically installed
     local_appdata = os.environ.get("LOCALAPPDATA", "")
@@ -529,6 +524,7 @@ def send_contact_card(target_person, contact_to_share):
     print(f"✅ Contact card for '{contact_to_share}' sent to {target_person}")
     
 # -------- READ LATEST MESSAGE FROM SPECIFIC PERSON --------
+# -------- READ LATEST MESSAGE FROM SPECIFIC PERSON --------
 def read_specific_message(contact):
     focus_whatsapp()
     time.sleep(1)
@@ -552,38 +548,59 @@ def read_specific_message(contact):
     pyautogui.press("enter")
     time.sleep(1.5) # Wait for chat to open
 
-   # 4. Copy the last message
-    pyperclip.copy("EMPTY_MARKER")
+    # 4. Copy the messages using a Loop!
+    all_messages = []
     
-    # 🎯 THE REAL FIX: It usually takes 3 or 4 Shift+Tabs to bypass the 
-    # Emoji and Attach buttons to finally reach the message history.
+    # Jump backwards 3 times to safely reach the message history
     for _ in range(3):
         pyautogui.hotkey("shift", "tab") 
         time.sleep(0.2)
     
-    pyautogui.press("right")
-    pyautogui.press("enter")
-    pyautogui.press("down")
-    pyautogui.press("enter")
+    # 🔥 THE LOOP FIX: Try to read up to 5 messages in a row
+    for _ in range(5):
+        pyperclip.copy("EMPTY_MARKER")
+        
+        # Your custom UI bypass logic to copy ONE message
+        pyautogui.press("right")
+        pyautogui.press("enter")
+        pyautogui.press("down")
+        pyautogui.press("enter")
+        time.sleep(0.3)
+        
+        current_msg = pyperclip.paste()
+        
+        # If nothing copied, or we are copying the exact same message again, stop the loop!
+        if current_msg == "EMPTY_MARKER" or current_msg in all_messages:
+            break
+            
+        # Save the message to our list
+        all_messages.append(current_msg)
+        
+        # Press Down to move the highlight to the next message bubble!
+        pyautogui.press("down")
+        time.sleep(0.2)
 
-
-    text = pyperclip.paste()
+    # Combine all the messages we collected into one clean paragraph
+    text = "\n".join(all_messages)
 
     # 5. Output the result
-    if text == "EMPTY_MARKER" or not text.strip():
+    if not all_messages:
         print(f"📭 JARVIS: Could not read a message from {contact}.")
         # speak(f"Could not read a message from {contact}.")
         return
 
-    print(f"📩 JARVIS: Message from {contact}: {text}")
-    # speak(f"Message from {contact} says: {text}")
+    # 🔥 THE CLEAN PRINT FIX
+    print(f"\n📩 JARVIS: Messages from {contact}:")
+    print("--------------------------------------------------")
+    print(text)
+    print("--------------------------------------------------\n")
+    # speak(f"Here are your messages from {contact}")
     
     # Return focus to the typing box to reset the UI state
-    # Since we went backwards 4 times, we go forward 4 times
-    for _ in range(4):
+    for _ in range(3):
         pyautogui.press("tab")
         time.sleep(0.1)
-        
+    
 # -------- SHOW UNREAD MESSAGES (FILTER ONLY) --------
 def show_unread_messages():
     focus_whatsapp()
