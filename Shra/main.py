@@ -6,10 +6,10 @@ Expose this function to your friend:
     process_command(command: str) -> dict
 """
 
-from AIVA.Shra.features.browser.controller import BrowserController
-from AIVA.Shra.brain.simple_command_parser import SimpleCommandParser
-from AIVA.Shra.brain.llm.llm_client import LLMClient
-from AIVA.Shra.brain.llm.response_parser import ResponseParser
+from features.browser.controller import BrowserController
+from brain.simple_command_parser import SimpleCommandParser
+from brain.llm.llm_client import LLMClient
+from brain.llm.response_parser import ResponseParser
 
 # 🔥 SINGLETON INSTANCES (important for session continuity)
 browser = BrowserController()

@@ -170,6 +170,7 @@ class YouTube:
         if "youtube" not in current_url:
             self.open()
 
+
         search_box = wait.until(
             EC.presence_of_element_located((By.NAME, "search_query"))
         )
