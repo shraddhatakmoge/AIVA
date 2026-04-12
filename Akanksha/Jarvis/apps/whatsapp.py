@@ -548,24 +548,21 @@ def read_specific_message(contact):
     pyautogui.press("enter")
     time.sleep(1.5) # Wait for chat to open
 
-    # 4. Copy the messages using a Loop!
+    # 4. Copy the messages using a FAST Loop!
     all_messages = []
     
-    # Jump backwards 3 times to safely reach the message history
+    # Jump backwards 3 times (⚡ FAST)
     for _ in range(3):
         pyautogui.hotkey("shift", "tab") 
-        time.sleep(0.2)
+        time.sleep(0.05) # Sped up from 0.2
     
-    # 🔥 THE LOOP FIX: Try to read up to 5 messages in a row
+    # 🔥 THE FAST LOOP FIX: Try to read up to 5 messages in a row
     for _ in range(5):
         pyperclip.copy("EMPTY_MARKER")
         
-        # Your custom UI bypass logic to copy ONE message
-        pyautogui.press("right")
-        pyautogui.press("enter")
-        pyautogui.press("down")
-        pyautogui.press("enter")
-        time.sleep(0.3)
+        # ⚡ Fire all 4 bypass keys instantly in one sequence!
+        pyautogui.press(['right', 'enter', 'down', 'enter'], interval=0.02)
+        time.sleep(0.1) # Sped up from 0.3. Just enough time for WhatsApp to copy to clipboard.
         
         current_msg = pyperclip.paste()
         
@@ -578,7 +575,7 @@ def read_specific_message(contact):
         
         # Press Down to move the highlight to the next message bubble!
         pyautogui.press("down")
-        time.sleep(0.2)
+        time.sleep(0.05) # Sped up from 0.2
 
     # Combine all the messages we collected into one clean paragraph
     text = "\n".join(all_messages)
@@ -597,9 +594,8 @@ def read_specific_message(contact):
     # speak(f"Here are your messages from {contact}")
     
     # Return focus to the typing box to reset the UI state
-    for _ in range(3):
-        pyautogui.press("tab")
-        time.sleep(0.1)
+    # ⚡ Rapid-fire reset back to the typing box
+    pyautogui.press(['tab', 'tab', 'tab'], interval=0.02)
     
 # -------- SHOW UNREAD MESSAGES (FILTER ONLY) --------
 def show_unread_messages():
