@@ -133,14 +133,29 @@ def send_screenshot(contact):
     focus_whatsapp()
     time.sleep(1)
 
-    # 🔥 STRICT LOCAL PATH FIX
+    # 🔥 SMART SCREENSHOT PATH FIX (Portable across different PCs)
     user_profile = os.path.expanduser('~')
-    folder = os.path.join(user_profile, "Pictures", "Screenshots")
+    
+    # Check OneDrive first (since your PC uses it), then the standard local path
+    paths_to_check = [
+        os.path.join(user_profile, "OneDrive", "Pictures", "Screenshots"),
+        os.path.join(user_profile, "Pictures", "Screenshots")
+    ]
+    
+    folder = None
+    for p in paths_to_check:
+        if os.path.exists(p):
+            folder = p
+            break
+
+    if not folder:
+        print("❌ JARVIS: Could not find the Screenshots folder on this PC.")
+        return
 
     path = get_latest_screenshot(folder)
 
     if not path:
-        print("❌ No screenshot found at", folder)
+        print(f"❌ No screenshots found in {folder}")
         return
 
     print("📸 Sending:", path)
@@ -181,7 +196,7 @@ def send_screenshot(contact):
     pyautogui.press("enter")
     pyautogui.press("enter")
 
-    print("✅ Latest screenshot sent")
+    print(f"✅ Latest screenshot sent to {contact}")
 
 # --------- VOICE CALL ---------
 def voice_call(contact):
