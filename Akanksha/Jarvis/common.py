@@ -39,13 +39,13 @@ def close_app(app_name):
     os.system(f"taskkill /f /im {app_name}.exe >nul 2>&1")
     
 # -------- SEARCH FOR FILES (SMART PORTABLE & MULTI-MATCH) --------
-def find_document(spoken_name, specific_location=None):
+def find_document(spoken_name, specific_location=None, return_all=False):
     
-    # Map the spoken words to actual Windows paths
+    # Map the spoken words to actual Windows paths (NO ONEDRIVE)
     location_map = {
-        "documents": [os.path.expanduser("~\\Documents"), os.path.expanduser("~\\OneDrive\\Documents")],
+        "documents": [os.path.expanduser("~\\Documents")],
         "downloads": [os.path.expanduser("~\\Downloads")],
-        "desktop": [os.path.expanduser("~\\Desktop"), os.path.expanduser("~\\OneDrive\\Desktop")]
+        "desktop": [os.path.expanduser("~\\Desktop")]
     }
 
     # 🔥 Decide where to search based on the user's command
@@ -53,18 +53,15 @@ def find_document(spoken_name, specific_location=None):
         search_paths = location_map[specific_location]
         
     else:
-        # Search everywhere if no location was mentioned
+        # Search everywhere if no location was mentioned (LOCAL ONLY)
         search_paths = [
             os.path.expanduser("~\\Documents"),
             os.path.expanduser("~\\Downloads"),
-            os.path.expanduser("~\\Desktop"),
-            os.path.expanduser("~\\OneDrive\\Documents"), 
-            os.path.expanduser("~\\OneDrive\\Desktop")    
+            os.path.expanduser("~\\Desktop")
         ]
 
     spoken_lower = spoken_name.lower().strip()
     search_words = spoken_lower.split()
-
 
     # We will store ALL matches we find in this list
     found_files = []

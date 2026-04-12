@@ -17,6 +17,31 @@ pyautogui.FAILSAFE = False
 def toggle_mic():
     pyautogui.hotkey("win", "alt", "k")
 
+import os
+import re
+# ... your other imports ...
+
+import os
+
+def get_desktop_path(folder_name="Desktop"):
+    r"""
+    Forces the path to the strict local C:\Users\<User>\... 
+    Defaults to Desktop, but also supports Documents and Downloads.
+    """
+    user_profile = os.path.expanduser("~") 
+    
+    # Map the requested folder to the strict local path
+    location_map = {
+        "desktop": os.path.join(user_profile, "Desktop"),
+        "documents": os.path.join(user_profile, "Documents"),
+        "downloads": os.path.join(user_profile, "Downloads")
+    }
+    
+    # Convert input to lowercase to prevent case-sensitivity errors
+    folder_key = folder_name.lower()
+    
+    # Return the requested path (Defaults to Desktop if an unknown name is passed)
+    return location_map.get(folder_key, location_map["desktop"])
 
 # ==============================
 # 🧠 ACTIVE APP DETECTION
@@ -56,16 +81,52 @@ def execute_action(data, original_command=""):
     # ==============================
     # 📂 FILE SYSTEM (NEW)
     # ==============================
+    # ==============================
+    # 📂 FILE SYSTEM (NEW)
+    # ==============================
     if app == "file_system":
         intent = data.get("intent")
-        entities = data.get("entities")
+        entities = data.get("entities", {})
 
-        # Call your professional file_service!
+        # --- CREATE FOLDER LOGIC ---
+        if intent == "create_folder":
+            folder_name = entities.get("path", "New Folder")
+            desktop_path = get_desktop_path() 
+            final_path = os.path.join(desktop_path, folder_name)
+                
+            try:
+                os.makedirs(final_path, exist_ok=True)
+                print(f"✅ JARVIS: Folder '{folder_name}' created successfully at {final_path}")
+            except Exception as e:
+                print(f"❌ JARVIS: Could not create folder. Error: {e}")
+            return True
+
+        # 🔥 --- CREATE FILE LOGIC (NEW FIX) --- 🔥
+        elif intent == "create_file":
+            file_name = entities.get("path", "New_File.txt")
+            
+            # Smart Extension: Default to .txt if no extension was spoken
+            if "." not in file_name:
+                file_name += ".txt"
+                
+            desktop_path = get_desktop_path() 
+            final_path = os.path.join(desktop_path, file_name)
+                
+            try:
+                # This physically creates an empty file on the hard drive
+                with open(final_path, 'w') as f:
+                    pass 
+                print(f"✅ JARVIS: File '{file_name}' created successfully at {final_path}")
+            except Exception as e:
+                print(f"❌ JARVIS: Could not create file. Error: {e}")
+            return True
+
+        # Call your professional file_service for anything else!
         result = handle_file_command(intent, entities)
 
         if result["status"] == "success":
             print(f"✅ JARVIS: {result['message']}")
-            if intent == "search_file" and result["data"]:
+            if intent == "search_file" and result.get("data"):
                 print("Found matches:")
                 for path in result["data"]:
                     print(f" - {path}")
@@ -216,7 +277,6 @@ def execute_action(data, original_command=""):
         elif action == "stop_voice":
             stop_voice_message()
 
-        # In main(brain).py under the WhatsApp section:
         elif action == "send_attachment":
             contact = data.get("contact")
             spoken_file = data.get("file_name")
@@ -224,12 +284,16 @@ def execute_action(data, original_command=""):
             
             if contact and spoken_file:
                 # Pass the location into your search tool!
+                # real_file_path will now either be a single string path, or None (if cancelled/not found)
                 real_file_path = find_document(spoken_file, specific_location=location)
                 
                 if real_file_path:
+                    # Make sure send_attachment in whatsapp.py is ready to accept a full path
                     send_attachment(contact, real_file_path)
                 else:
-                    print("🎙️ JARVIS SAYS: 'I could not find that file on your computer.'")
+                    # It will print this if not found, OR if the user typed 'cancel'
+                    if "cancel" not in str(real_file_path): 
+                        print("🎙️ JARVIS SAYS: 'I could not find that file or the action was cancelled.'")
                     
         elif action == "send_contact_card":
             raw_target = data.get("target")
@@ -448,15 +512,7 @@ def execute_action(data, original_command=""):
             return True
     
 
-    # ==============================
-    # ⚙️ SYSTEM
-    # ==============================
-    elif app == "system":
-        if action in ("mute_mic", "unmute_mic"):
-            toggle_mic()
-        return True
 
-    return False  # nothing matched
 
 
 # ==============================
@@ -493,7 +549,6 @@ def is_nlp_confident(data):
         print("   🔍 DEBUG: Action/Intent is None. NLP is NOT confident. Sending to LLM...")
         return False
         
-    # print(f"   🔍 DEBUG: Action/Intent found. NLP IS confident. Executing locally...")
     return True
 
 # ==============================

@@ -133,18 +133,14 @@ def send_screenshot(contact):
     focus_whatsapp()
     time.sleep(1)
 
-    # 🔥 DYNAMIC PATH FIX: Automatically finds the Screenshots folder for ANY user
+    # 🔥 STRICT LOCAL PATH FIX
     user_profile = os.path.expanduser('~')
-    onedrive_path = os.path.join(user_profile, "OneDrive", "Pictures", "Screenshots")
-    local_path = os.path.join(user_profile, "Pictures", "Screenshots")
-    
-    # Check if their laptop uses OneDrive or Local storage
-    folder = onedrive_path if os.path.exists(onedrive_path) else local_path
+    folder = os.path.join(user_profile, "Pictures", "Screenshots")
 
     path = get_latest_screenshot(folder)
 
     if not path:
-        print("❌ No screenshot found")
+        print("❌ No screenshot found at", folder)
         return
 
     print("📸 Sending:", path)
@@ -166,6 +162,10 @@ def send_screenshot(contact):
     # 🔥 Step 4: Open chat
     pyautogui.hotkey("ctrl", "f")
     time.sleep(1)
+    pyautogui.hotkey("ctrl", "a")
+    time.sleep(0.2)
+    pyautogui.press("backspace")
+    time.sleep(0.3)
 
     pyautogui.write(contact)
     time.sleep(2)
@@ -178,6 +178,7 @@ def send_screenshot(contact):
     pyautogui.hotkey("ctrl", "v")
     time.sleep(1)
 
+    pyautogui.press("enter")
     pyautogui.press("enter")
 
     print("✅ Latest screenshot sent")
@@ -375,74 +376,82 @@ def stop_voice_message():
 # -------- SEND ATTACHMENT (DOCUMENT/FILE) --------
 def send_attachment(contact, filename, search_location=None):
     """
-    Portable version: Uses keyboard shortcuts and dynamic pathing.
-    No hardcoded coordinates or user-specific paths.
+    Portable version: Now supports both simple filenames and full paths.
     """
     # --- STEP 1: DYNAMIC PATH RESOLUTION ---
-    user_home = os.path.expanduser("~")
     
-    # Map spoken locations to actual system paths
-    location_map = {
-        "desktop": os.path.join(user_home, "Desktop"),
-        "downloads": os.path.join(user_home, "Downloads"),
-        "documents": os.path.join(user_home, "Documents")
-    }
-    
-    file_path = None
-    
-    # If you specified a location (e.g., "from desktop")
-    if search_location and search_location.lower() in location_map:
-        file_path = os.path.join(location_map[search_location.lower()], filename)
+    # 🔥 THE FIX: If 'filename' is already a full path, use it directly!
+    if os.path.isabs(filename) and os.path.exists(filename):
+        file_path = filename
     else:
-        # Otherwise, search all common folders automatically
-        for folder in location_map.values():
-            temp_path = os.path.join(folder, filename)
+        # Otherwise, perform the search logic we built earlier
+        user_home = os.path.expanduser("~")
+        location_map = {
+            "desktop": os.path.join(user_home, "Desktop"),
+            "downloads": os.path.join(user_home, "Downloads"),
+            "documents": os.path.join(user_home, "Documents")
+        }
+        
+        file_path = None
+        
+        # Priority search for local desktop (where you create files)
+        local_desktop = location_map["desktop"]
+        
+        # Check if the file (with or without .txt) exists there
+        for ext in ["", ".txt", ".docx", ".pdf"]:
+            temp_name = filename + ext
+            temp_path = os.path.join(local_desktop, temp_name)
             if os.path.exists(temp_path):
                 file_path = temp_path
                 break
 
-    if not file_path or not os.path.exists(file_path):
-        print(f"❌ JARVIS: Could not find '{filename}' in common folders.")
+    if not file_path:
+        print(f"❌ JARVIS: Could not find '{filename}' on Desktop or other folders.")
         return
 
     # --- STEP 2: PORTABLE UI NAVIGATION ---
+    print(f"📎 JARVIS: Path verified: {file_path}")
     focus_whatsapp()
-    time.sleep(1)
 
     # Universal Search shortcut
     pyautogui.hotkey("ctrl", "f")
     time.sleep(0.5)
-    pyautogui.hotkey("ctrl", "a")   # select all
+    pyautogui.hotkey("ctrl", "a")
     time.sleep(0.3)
-    pyautogui.press("backspace")    # delete
+    pyautogui.press("backspace")
     time.sleep(0.3)
     pyautogui.write(contact)
     time.sleep(1.5)
     pyautogui.press("enter")
     time.sleep(1)
 
-    print(f"📎 JARVIS: Attaching {filename}...")
     
-    # Navigation: From the message box, Shift+Tab usually hits the '+' button
+    # Navigation to '+' button
     pyautogui.hotkey("shift", "tab")
     pyautogui.hotkey("shift", "tab")
-
     time.sleep(0.3)
-    pyautogui.press("enter") # Opens the attachment menu
+    pyautogui.press("enter") 
     time.sleep(1)
 
-    # Select 'Document' (First item in menu)
+    # Select 'Document'
     pyautogui.press("enter") 
     time.sleep(2)
 
-    # Standard Windows File Dialog (This is universal)
+    # Standard Windows File Dialog
     pyautogui.write(file_path)
     time.sleep(0.5)
     pyautogui.press("enter")
     
-    # ==========================================
-    # 🔥 THE FIX STARTS HERE
-    # ==========================================
+    # --- PREVIEW & SEND ---
+    time.sleep(4) 
+    
+    focus_whatsapp() 
+    time.sleep(0.5)
+    pyautogui.press("tab")
+    time.sleep(0.3)
+    pyautogui.press("enter")
+    
+    print(f"✅ JARVIS: Document sent to {contact}")
     
     # 1. Wait longer for the Preview screen to appear
     print("⏳ JARVIS: Waiting for file preview...")
@@ -523,7 +532,6 @@ def send_contact_card(target_person, contact_to_share):
     print(f"✅ Contact card for '{contact_to_share}' sent to {target_person}")
     
 # -------- READ LATEST MESSAGE FROM SPECIFIC PERSON --------
-# -------- READ LATEST MESSAGE FROM SPECIFIC PERSON --------
 def read_specific_message(contact):
     focus_whatsapp()
     time.sleep(1)
@@ -594,9 +602,11 @@ def read_specific_message(contact):
     
     # Return focus to the typing box to reset the UI state
     # ⚡ Rapid-fire reset back to the typing box
-    pyautogui.press(['tab', 'tab', 'tab'], interval=0.02)
-    
-# -------- SHOW UNREAD MESSAGES (FILTER ONLY) --------
+    pyautogui.press(['tab', 'tab', 'tab'], interval=0.02) 
+
+
+# ------ SHOW UNREAD MESSAGES (FILTER ONLY) --------
+
 def show_unread_messages():
     focus_whatsapp()
     time.sleep(1)

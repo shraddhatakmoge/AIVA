@@ -24,40 +24,45 @@ from .search_operations import (
 
 def resolve_path(path):
     """
-    Finds the REAL Desktop or Documents folder, even if OneDrive is active.
+    Strictly forces the REAL local Desktop folder.
+    Also features 'Smart Extension' detection for missing file types.
     """
-    # 1. Start with the standard User Profile
     user_profile = os.path.expanduser("~")
-    
-    # 2. Check for OneDrive Desktop/Documents first
-    onedrive_path = os.path.join(user_profile, "OneDrive")
-    
-    # Default search order: OneDrive -> Local User Folder
-    if os.path.exists(onedrive_path):
-        base_dir = onedrive_path
-    else:
-        base_dir = user_profile
+    base_dir = os.path.join(user_profile, "Desktop")
 
-    # 3. If the user gave an absolute path, use it. 
-    # Otherwise, default to the Desktop so we can see the results!
+    # Build the target path
     if not os.path.isabs(path):
-        target_dir = os.path.join(base_dir, "Desktop")
-        return os.path.join(target_dir, path)
+        target_path = os.path.join(base_dir, path)
+    else:
+        target_path = path
 
-    return path
+    # 🔥 THE SMART EXTENSION FIX
+    # If the exact file doesn't exist, intelligently check for common extensions
+    if not os.path.exists(target_path):
+        if os.path.exists(target_path + ".txt"):
+            return target_path + ".txt"
+        elif os.path.exists(target_path + ".docx"):
+            return target_path + ".docx"
+
+    return target_path
 
 def handle_file_command(intent, entities):
-
     try:
-
+        # 🔥 SMART FILE CREATION
         if intent == "create_file":
-            path = resolve_path(entities["path"])
+            filename = entities["path"]
+            
+            # Default to .txt if no extension was spoken
+            if "." not in filename:
+                filename += ".txt"
+                
+            path = resolve_path(filename)
             return create_file(path, entities.get("content", ""))
 
         elif intent == "delete_file":
             path = resolve_path(entities["path"])
             return delete_file(path)
-
+            
         elif intent == "rename_file":
             old_path = resolve_path(entities["old_path"])
             new_path = resolve_path(entities["new_path"])

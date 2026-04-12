@@ -41,7 +41,7 @@ def process_nlp(command, current_app="notepad"):
         result["app"] = "spotify"
     elif "notepad" in cmd:
         result["app"] = "notepad"
-    elif any(x in cmd for x in ["file", "folder", "directory", "document"]) and not "open file" in cmd and result["app"] != "word":
+    elif any(x in cmd for x in ["file", "folder", "directory", "document"]) and not any(x in cmd for x in ["open file", "send "]) and result["app"] != "word":
         result["app"] = "file_system"
     elif any(x in cmd for x in ["powerpoint", "presentation","ppt", "slide", "slideshow"]):
         result["app"] = "powerpoint"
@@ -49,7 +49,7 @@ def process_nlp(command, current_app="notepad"):
         result["app"] = "word"
     elif any(x in cmd for x in ["calculator", "calculate", "math", "+", "-", "*", "/"]):
         result["app"] = "calculator"
-    elif any(x in cmd for x in ["whatsapp", "message", "call", "chat"]):
+    elif any(x in cmd for x in ["whatsapp", "message", "call", "chat", "send "]):
         result["app"] = "whatsapp"
     else:
         result["app"] = current_app 
@@ -76,11 +76,24 @@ def process_nlp(command, current_app="notepad"):
         match_search = re.search(r"(?:search for|find|look for)(?: file)? (.*)", cmd)
         if match_search: return {"app": "file_system", "intent": "search_file", "entities": {"filename": match_search.group(1).strip(), "directory": os.path.expanduser("~")}}
 
-        match_move = re.search(r"(?:move|transfer) (.*) to (.*)", cmd)
-        if match_move: return {"app": "file_system", "intent": "move_file", "entities": {"source": match_move.group(1).strip(), "destination": match_move.group(2).strip()}}
-                
-        match_copy = re.search(r"(?:copy|duplicate) (.*) to (.*)", cmd)
-        if match_copy: return {"app": "file_system", "intent": "copy_file", "entities": {"source": match_copy.group(1).strip(), "destination": match_copy.group(2).strip()}}
+        # 🔥 SMART MOVE & COPY LOGIC
+        match_move = re.search(r"(?:move|transfer|copy|duplicate)\s+(.*?)\s+to\s+(.*)", cmd, re.IGNORECASE)
+        if match_move: 
+            intent = "copy_file" if any(x in cmd for x in ["copy", "duplicate"]) else "move_file"
+            
+            # Grab the raw matches
+            raw_source = match_move.group(1).strip()
+            raw_dest = match_move.group(2).strip()
+            
+            # 🔥 THE FIX: Strip the words 'file', 'folder', or 'directory' from the start of the names
+            clean_source = re.sub(r'^(file|folder|directory)\s+', '', raw_source, flags=re.IGNORECASE)
+            clean_dest = re.sub(r'^(file|folder|directory)\s+', '', raw_dest, flags=re.IGNORECASE)
+            
+            return {
+                "app": "file_system", 
+                "intent": intent, 
+                "entities": {"source": clean_source, "destination": clean_dest}
+            }
 
         match_rename = re.search(r"(?:rename|change name of) (.*) to (.*)", cmd)
         if match_rename: return {"app": "file_system", "intent": "rename_file", "entities": {"old_path": match_rename.group(1).strip(), "new_path": match_rename.group(2).strip()}}
@@ -362,15 +375,18 @@ def process_nlp(command, current_app="notepad"):
     
     elif "stop recording" in cmd or "stop voice" in cmd: return {"app": "whatsapp", "action": "stop_voice"}
     
-    # "Send message to Shraddha saying hello there"
-    # 🔥 THE FIX: Strips 'message to' or 'whatsapp to' from the contact name
-    match_send_saying = re.search(r"(?:send|message|whatsapp)(?:\s+a\s+message)?(?:\s+to)?\s+(.*?)(?:\s+saying|\s+that\s+says|:|$) (.*)", raw_text_command, re.IGNORECASE)
-    if match_send_saying:
-        contact = match_send_saying.group(1).strip()
-        # Remove 'message to' if it accidentally got caught
-        contact = re.sub(r'^(message to|whatsapp to|to)\s+', '', contact, flags=re.IGNORECASE)
-        return {"app": "whatsapp", "action": "send_to", "contact": contact, "text": match_send_saying.group(2).strip()}
-
+    # 1. THE SPECIFIC RULE: Attachments
+    match_attachment = re.search(r"send (?:file|folder|document|attachment)\s+(.*?)(?:\s+(?:from|in)\s+(desktop|downloads|documents))?\s+to\s+(.*)", cmd)
+    if match_attachment: 
+        return {
+            "app": "whatsapp", 
+            "action": "send_attachment", 
+            "file_name": match_attachment.group(1).strip(), 
+            "location": match_attachment.group(2).strip() if match_attachment.group(2) else None, 
+            "contact": match_attachment.group(3).strip()
+        }
+    
+    # 2. OTHER WHATSAPP COMMANDS
     match_send = re.search(r"send message (.*)", raw_text_command, re.IGNORECASE)
     if match_send: return {"app": "whatsapp", "action": "send", "text": match_send.group(1).strip()}
     
@@ -388,7 +404,4 @@ def process_nlp(command, current_app="notepad"):
     match_contact_card = re.search(r"send contact (.*) to (.*)", cmd)
     if match_contact_card: return {"app": "whatsapp", "action": "send_contact_card", "share_name": match_contact_card.group(1).strip(), "target": match_contact_card.group(2).strip()}
     
-    match_attachment = re.search(r"send (?:file|document|attachment) (.*) (?:from|in) (desktop|downloads|documents) to (.*)", cmd)
-    if match_attachment: return {"app": "whatsapp", "action": "send_attachment", "file_name": match_attachment.group(1).strip(), "location": match_attachment.group(2).strip(), "contact": match_attachment.group(3).strip()}
-
     return result
