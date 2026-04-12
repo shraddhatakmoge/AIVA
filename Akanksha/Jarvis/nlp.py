@@ -5,8 +5,13 @@ def process_nlp(command, current_app="notepad"):
     raw_text_command = command.strip() 
     cmd = command.lower().strip()
 
-    # --- Brain Polish (Filler removal) ---
-    fillers = ["please", "jarvis", "can you", "could you", "i want to", "just", "kindly", "hey"]
+    # =========================================
+    # 🧠 STEP 1: SMART FILLER REMOVAL
+    # =========================================
+    fillers = [
+        "please", "jarvis", "can you", "could you", "i want to", "just", 
+        "kindly", "hey", "for me", "a new", "an", "the", "go ahead and"
+    ]
     for word in fillers:
         cmd = re.sub(rf'\b{word}\b', '', cmd)
         raw_text_command = re.sub(rf'\b{word}\b', '', raw_text_command, flags=re.IGNORECASE)
@@ -15,125 +20,127 @@ def process_nlp(command, current_app="notepad"):
     raw_text_command = re.sub(' +', ' ', raw_text_command).strip()
 
     result = {
-        "app": None,
-        "action": None,
-        "text": None,
+        "app": None, 
+        "action": None, 
+        "text": None, 
         "line": None,
-        "direction": None,
-        "contact": None,
-        "folder": None,
-        "level": None,
-        "style": None,
-        "align": None
+        "direction": None, 
+        "contact": None, 
+        "folder": None, 
+        "level": None, 
+        "style": None, 
+        "align": None,
+        "color": None,  
+        "size": None   
     }
 
     # =========================================
-    # 🧠 STEP 1: EXPLICIT APP DETECTION
+    # 🧠 STEP 2: EXPLICIT APP DETECTION
     # =========================================
-    if "spotify" in cmd or "music" in cmd or "song" in cmd:
+    if any(x in cmd for x in ["spotify", "music", "song", "playlist"]):
         result["app"] = "spotify"
-    elif any(x in cmd for x in ["file", "folder", "search for", "find", "document"]):
-        result["app"] = "file_system"
-    elif any(x in cmd for x in ["powerpoint", "presentation","ppt", "slide", "title", "content"]):
-        result["app"] = "powerpoint"
-    elif ("word" in cmd and not any(x in cmd for x in ["delete word", "replace word", "style word", "make word", "make the word"])) or "ms word" in cmd:
-        result["app"] = "word"
-    elif "calculator" in cmd or "calculate" in cmd or "+" in cmd or "-" in cmd or "*" in cmd or "/" in cmd:
-        result["app"] = "calculator"
-    elif "whatsapp" in cmd or "message" in cmd or "call" in cmd:
-        result["app"] = "whatsapp"
     elif "notepad" in cmd:
-         result["app"] = "notepad"
+        result["app"] = "notepad"
+    elif any(x in cmd for x in ["file", "folder", "directory", "document"]) and not "open file" in cmd and result["app"] != "word":
+        result["app"] = "file_system"
+    elif any(x in cmd for x in ["powerpoint", "presentation","ppt", "slide", "slideshow"]):
+        result["app"] = "powerpoint"
+    elif ("word" in cmd or "document" in cmd) and not any(x in cmd for x in ["delete word", "replace word"]):
+        result["app"] = "word"
+    elif any(x in cmd for x in ["calculator", "calculate", "math", "+", "-", "*", "/"]):
+        result["app"] = "calculator"
+    elif any(x in cmd for x in ["whatsapp", "message", "call", "chat"]):
+        result["app"] = "whatsapp"
     else:
-        # 🔥 THE MAGIC TRICK: If they didn't specify an app, use the Memory!
-        result["app"] = current_app
-    
+        result["app"] = current_app 
+
 
     # =========================================
-    # 📂 STEP 2: FILE SYSTEM (PRIORITY OVERRIDE)
+    # 📂 STEP 3: FILE SYSTEM (FLEXIBLE REGEX)
     # =========================================
-    # 🔥 THIS MUST BE HERE, BEFORE POWERPOINT OR NOTEPAD LOGIC
     if result["app"] == "file_system":
         
-        if "create folder" in cmd or "make folder" in cmd: 
-            return {"app": "file_system", "intent": "create_folder", "entities": {"path": cmd.replace("create folder", "").replace("make folder", "").strip()}}
+        match_folder = re.search(r"(?:create|make|generate)(?: folder| directory)(?: called| named)? (.*)", cmd)
+        if match_folder: return {"app": "file_system", "intent": "create_folder", "entities": {"path": match_folder.group(1).strip()}}
         
-        elif "create file" in cmd or "make file" in cmd: 
-            return {"app": "file_system", "intent": "create_file", "entities": {"path": cmd.replace("create file", "").replace("make file", "").strip()}}
-        
-        elif "delete folder" in cmd:
-            return {"app": "file_system", "intent": "delete_folder", "entities": {"path": cmd.replace("delete folder", "").strip()}}
+        match_file = re.search(r"(?:create|make|generate)(?: file)(?: called| named)? (.*)", cmd)
+        if match_file: return {"app": "file_system", "intent": "create_file", "entities": {"path": match_file.group(1).strip() if match_file.group(1) else "Untitled.txt"}}
+        elif "create file" in cmd or "make file" in cmd: return {"app": "file_system", "intent": "create_file", "entities": {"path": "Untitled.txt"}}
+
+        match_del_folder = re.search(r"(?:delete|remove|destroy)(?: folder| directory) (.*)", cmd)
+        if match_del_folder: return {"app": "file_system", "intent": "delete_folder", "entities": {"path": match_del_folder.group(1).strip()}}
             
-        elif "delete file" in cmd or "delete" in cmd:
-            return {"app": "file_system", "intent": "delete_file", "entities": {"path": cmd.replace("delete file", "").replace("delete", "").strip()}}
+        match_del_file = re.search(r"(?:delete|remove|destroy)(?: file)? (.*)", cmd)
+        if match_del_file: return {"app": "file_system", "intent": "delete_file", "entities": {"path": match_del_file.group(1).strip()}}
 
-        elif "search for" in cmd or "find file" in cmd: 
-            return {"app": "file_system", "intent": "search_file", "entities": {"filename": cmd.replace("search for", "").replace("find file", "").strip(), "directory": os.path.expanduser("~")}}
+        match_search = re.search(r"(?:search for|find|look for)(?: file)? (.*)", cmd)
+        if match_search: return {"app": "file_system", "intent": "search_file", "entities": {"filename": match_search.group(1).strip(), "directory": os.path.expanduser("~")}}
 
-        elif "move" in cmd and "to" in cmd:
-            parts = cmd.replace("move file", "").replace("move folder", "").replace("move", "").split(" to ")
-            if len(parts) == 2:
-                return {"app": "file_system", "intent": "move_file", "entities": {"source": parts[0].strip(), "destination": parts[1].strip()}}
+        match_move = re.search(r"(?:move|transfer) (.*) to (.*)", cmd)
+        if match_move: return {"app": "file_system", "intent": "move_file", "entities": {"source": match_move.group(1).strip(), "destination": match_move.group(2).strip()}}
                 
-        elif "copy" in cmd and "to" in cmd:
-            parts = cmd.replace("copy file", "").replace("copy folder", "").replace("copy", "").split(" to ")
-            if len(parts) == 2:
-                return {"app": "file_system", "intent": "copy_file", "entities": {"source": parts[0].strip(), "destination": parts[1].strip()}}
+        match_copy = re.search(r"(?:copy|duplicate) (.*) to (.*)", cmd)
+        if match_copy: return {"app": "file_system", "intent": "copy_file", "entities": {"source": match_copy.group(1).strip(), "destination": match_copy.group(2).strip()}}
 
-        elif "rename" in cmd and "to" in cmd:
-            parts = cmd.replace("rename file", "").replace("rename folder", "").replace("rename", "").split(" to ")
-            if len(parts) == 2:
-                return {"app": "file_system", "intent": "rename_file", "entities": {"old_path": parts[0].strip(), "new_path": parts[1].strip()}}
+        match_rename = re.search(r"(?:rename|change name of) (.*) to (.*)", cmd)
+        if match_rename: return {"app": "file_system", "intent": "rename_file", "entities": {"old_path": match_rename.group(1).strip(), "new_path": match_rename.group(2).strip()}}
 
-        # Add this right after your "create" and "delete" checks!
-        elif "open folder" in cmd or "open file" in cmd:
-            target = cmd.replace("open folder", "").replace("open file", "").replace("open", "").strip()
-            return {"app": "file_system", "intent": "open_item", "entities": {"path": target}}
+        match_open = re.search(r"(?:open|launch)(?: file| folder)? (.*)", cmd)
+        if match_open: return {"app": "file_system", "intent": "open_item", "entities": {"path": match_open.group(1).strip()}}
 
     # =========================================
     # 📊 POWERPOINT LOGIC
     # =========================================
     powerpoint_keywords = ["powerpoint", "presentation", "slide", "title", "content", "subtitle", "slideshow", "present", "theme", "design"]
     
-    # 🔥 THE FIX: Only enter this block if it's explicitly PowerPoint
-    # We removed "next" and "previous" from the keywords list above to prevent stealing
     if result["app"] == "powerpoint" or any(x in cmd for x in powerpoint_keywords):
         result["app"] = "powerpoint"
         
         if "open" in cmd: result["action"] = "open"
         elif "close" in cmd: result["action"] = "close"
         elif "add slide" in cmd or "new slide" in cmd: result["action"] = "add_slide"
+        
         elif "title" in cmd:
             result["action"] = "set_title"
-            result["text"] = re.sub(r'(?i).*title\s+(?:to\s+)?', '', raw_text_command).strip()
+            match = re.search(r"(?:set|change|make)(?: title)(?: to)? (.*)", raw_text_command, re.IGNORECASE)
+            result["text"] = match.group(1).strip() if match else re.sub(r'(?i).*title\s+(?:to\s+)?', '', raw_text_command).strip()
+            
         elif "content" in cmd:
             result["action"] = "set_content"
-            result["text"] = re.sub(r'(?i).*content\s+(?:to\s+)?', '', raw_text_command).strip()
+            match = re.search(r"(?:set|change|make)(?: content)(?: to)? (.*)", raw_text_command, re.IGNORECASE)
+            result["text"] = match.group(1).strip() if match else re.sub(r'(?i).*content\s+(?:to\s+)?', '', raw_text_command).strip()
+            
         elif "delete" in cmd or "remove" in cmd:
             result["action"] = "delete_slide"
-            match = re.search(r"slide\s+(\d+)", cmd)
+            match = re.search(r"(?:delete|remove) slide (\d+)", cmd)
             result["text"] = match.group(1) if match else None
-        elif any(x in cmd for x in ["slideshow", "present", "start show"]):
+            
+        # 🔥 THE FIX: Use a fuzzy regex to catch "slideshow", "slide show", or "slidehsow"
+        elif any(x in cmd for x in ["slideshow", "slide show", "slideh", "present"]): 
             result["action"] = "start_slideshow"
-        elif any(x in cmd for x in ["next", "forward", "after"]):
-            result["action"] = "navigate"
-            result["text"] = "next"
             return result
-        elif any(x in cmd for x in ["previous", "back", "before"]):
-            result["action"] = "navigate"
-            result["text"] = "previous"
-            return result
-        elif any(x in cmd for x in ["stop", "exit", "end"]) and "slideshow" in cmd:
-            result["action"] = "stop_slideshow"
-            return result
+        elif any(x in cmd for x in ["next", "forward"]): return {"app": "powerpoint", "action": "navigate", "text": "next"}
+        elif any(x in cmd for x in ["previous", "back"]): return {"app": "powerpoint", "action": "navigate", "text": "previous"}
+        elif any(x in cmd for x in ["stop", "exit", "end"]) and "slideshow" in cmd: return {"app": "powerpoint", "action": "stop_slideshow"}
+        
         elif "go to slide" in cmd or "show slide" in cmd:
             result["action"] = "navigate"
-            match = re.search(r"slide\s+(\d+)", cmd)
+            match = re.search(r"(?:go to|show) slide (\d+)", cmd)
             result["text"] = match.group(1) if match else None
+            
         elif "theme" in cmd or "design" in cmd:
             result["action"] = "apply_theme"
-            theme = re.sub(r'(?i).*theme\s+|.*design\s+', '', raw_text_command).strip()
-            result["text"] = theme if theme else "Office Theme"
+            # 🔥 THE FIX: Use a non-capturing group to ignore "theme" or "design" if the user said it
+            match = re.search(r"(?:apply|use|set)(?: theme| design)? (.*)", raw_text_command, re.IGNORECASE)
+            if match:
+                theme_name = match.group(1).strip()
+                # Clean up any leftover words like "theme" or "design" from the start of the string
+                theme_name = re.sub(r'^(theme|design)\s+', '', theme_name, flags=re.IGNORECASE)
+                result["text"] = theme_name
+            else:
+                result["text"] = "Office Theme"
+            return result
+            
         return result
             
     # =========================================
@@ -153,82 +160,60 @@ def process_nlp(command, current_app="notepad"):
             parts = re.split(r'(?i)\b(?:write|type|add)\b\s+', raw_text_command)
             text_to_write = parts[-1].strip() if len(parts) > 1 else ""
             return {"app": "word", "action": "write", "text": text_to_write}
-        elif "save" in cmd:
+        # ---------- MS WORD: SAVE AS ----------
+        # Move this higher up in your Word block!
+        if "save" in cmd:
             result["action"] = "save"
             
-            # 🔥 IMPROVED REGEX: Specifically looks for the name after "as" or "named"
-            # It captures everything until it hits "on", "in", or the end of the string.
+            # Use regex to grab the filename specifically
             name_match = re.search(r"(?:as|named|called|name)\s+([\w\d_-]+)", cmd)
             
             if name_match:
                 filename = name_match.group(1).strip()
-                result["text"] = f"{filename}.docx"
+                result["text"] = f"{filename}.docx" # Force .docx for Word
             else:
-                # Only use "Document.docx" if absolutely no name was found
                 result["text"] = "Document.docx"
 
-            # 📂 PORTABLE FOLDER DETECTION
-            if "desktop" in cmd:
-                result["folder"] = os.path.expanduser("~\\Desktop")
-            elif "documents" in cmd:
+            # Check for folder preferences
+            if "documents" in cmd:
                 result["folder"] = os.path.expanduser("~\\Documents")
             else:
-                result["folder"] = os.path.expanduser("~\\Desktop") # Default
+                result["folder"] = os.path.expanduser("~\\Desktop")
                 
             return result
         elif "heading" in cmd:
             result["action"] = "heading"
             match = re.search(r"heading (\d)", cmd)
             result["level"] = int(match.group(1)) if match else 1
-        elif "make" in cmd and ("word" in cmd or "text" in cmd):
-            result["action"] = "style_specific"
-            target_match = re.search(r"(?:word|text)\s+([\w'-]+)", cmd)
-            if target_match: result["text"] = target_match.group(1).strip()
-            colors = ["red", "blue", "green", "yellow", "black", "purple", "orange"]
-            for c in colors:
-                if c in cmd: result["color"] = c; break
-            size_match = re.search(r"size\s+(\d+)", cmd)
-            if size_match: result["size"] = int(size_match.group(1))
-            if "bold" in cmd: result["style"] = "bold"
-            if "italic" in cmd: result["style"] = "italic"
-            if "underline" in cmd: result["style"] = "underline"
-        # Update these checks in the Word section of nlp.py
-        elif any(x in cmd for x in ["bold", "italic", "underline"]):
-            for s in ["bold", "italic", "underline"]:
-                if s in cmd: result["style"] = s; break
-            
-            result["action"] = "style_specific"
-            # 🔥 THE MULTI-WORD FIX: 
-            # Captures everything after "the words" or "the word"
-            match = re.search(r"(?:bold|italic|underline)(?: the word[s]?) (.*)", cmd)
-            if match:
-                # Store as a list if separated by 'and' or commas
-                raw_words = match.group(1).replace(" and ", ",").split(",")
-                result["text"] = [w.strip() for w in raw_words if w.strip()]
-            return result
+
+        # ---------- SMART TEXT STYLING (Colors, Bold, Sizes) ----------
+        color_list = ["red", "blue", "green", "yellow", "black", "purple", "orange", "pink", "white"]
+        style_list = ["bold", "italic", "underline"]
         
-        # Add these alongside your 'bold' check in nlp.py
-        elif "italic" in cmd or "italicize" in cmd:
+        if any(x in cmd for x in color_list + style_list + ["size", "color"]):
             result["action"] = "style_specific"
-            result["style"] = "italic"
-            match = re.search(r"(?:italicize|italic)(?: the word)? (.*)", cmd)
-            if match: result["text"] = match.group(1).strip()
+            
+            # 1. Color Extraction
+            for c in color_list:
+                if c in cmd: result["color"] = c; break
+                
+            # 2. Style Extraction
+            for s in style_list:
+                if s in cmd: result["style"] = s; break
+                
+            # 3. Size Extraction (Fixed to catch any number near 'size')
+            size_match = re.search(r"size\s*(\d+)", cmd)
+            if size_match: 
+                result["size"] = int(size_match.group(1))
+            
+            # 4. Target Word Extraction (Fixed to strip quotes)
+            # This looks for the word after 'word' and cleans off any ' or "
+            target_match = re.search(r"word\s+['\"]?([\w-]+)['\"]?", cmd)
+            if target_match:
+                result["text"] = target_match.group(1).strip()
+            
             return result
 
-        elif "underline" in cmd:
-            result["action"] = "style_specific"
-            result["style"] = "underline"
-            match = re.search(r"underline(?: the word)? (.*)", cmd)
-            if match: result["text"] = match.group(1).strip()
-            return result
-        elif "bold" in cmd:
-            result["action"] = "style_specific"
-            result["style"] = "bold"
-            # Extract the word to be bolded (e.g., "bold the word test" -> "test")
-            match = re.search(r"(?:bold|make bold)(?: the word)? (.*)", cmd)
-            if match:
-                result["text"] = match.group(1).strip()
-            return result
         elif "replace" in cmd or "change" in cmd:
             match = re.search(r"(?:replace|change) (.*?) (?:with|to) (.*)", cmd)
             if match:
@@ -263,131 +248,88 @@ def process_nlp(command, current_app="notepad"):
         return result
 
     # =========================================
-    # 📝 CLEANED NOTEPAD LOGIC
+    # 📝 NOTEPAD LOGIC (FLEXIBLE REGEX)
     # =========================================
-    # Since Notepad is our default, we handle its commands directly here
-    
-    # 1. OPEN / CLOSE
-    if "open notepad" in cmd: return {"app": "notepad", "action": "open"}
-    elif "close notepad" in cmd: return {"app": "notepad", "action": "close"}
+    if "open notepad" in cmd or "launch notepad" in cmd: return {"app": "notepad", "action": "open"}
+    elif "close notepad" in cmd or "exit notepad" in cmd: return {"app": "notepad", "action": "close"}
 
-    # 2. BULLETPROOF WRITE LOGIC
-    if "write" in cmd or "type" in cmd or "say " in cmd:
-        # Splits the string perfectly at the trigger word, keeping everything after it
-        parts = re.split(r'(?i)\b(?:write|type|add|say)\b\s+', raw_text_command)
-        text_to_write = parts[-1].strip() if len(parts) > 1 else ""
-        return {"app": result["app"] or "notepad", "action": "write", "text": text_to_write}
+    match_write = re.search(r"(?:write|type|add|say) (.*)", raw_text_command, re.IGNORECASE)
+    if match_write: return {"app": result["app"] or "notepad", "action": "write", "text": match_write.group(1).strip()}
 
-    # 3. SMART SAVE 
-    match_save = re.search(r"save (?:it |file )?(?:as|called|with name)? (.*)", raw_text_command, re.IGNORECASE)
+    match_save = re.search(r"save(?: it| file)?(?: as| called| named)? (.*)", raw_text_command, re.IGNORECASE)
     if match_save:
         filename = match_save.group(1).strip().replace(".", "").replace(",", "")
         if not filename.endswith(".txt"): filename += ".txt"
         return {"app": result["app"] or "notepad", "action": "save", "text": filename}
-    elif "save" in cmd:
-        return {"app": result["app"] or "notepad", "action": "save", "text": "test.txt"}
+    elif "save" in cmd: return {"app": result["app"] or "notepad", "action": "save", "text": "test.txt"}
 
-    # 4. DELETE / EDIT
-    match_del_line = re.search(r"delete word (.*?) from line (\d+)", cmd)
-    if match_del_line:
-        return {"app": result["app"] or "notepad", "action": "delete", "text": match_del_line.group(1).strip(), "line": int(match_del_line.group(2))}
-    # Extracts the number so JARVIS knows WHICH line to delete
-    match_del_line_num = re.search(r"delete line (\d+)", cmd)
-    if match_del_line_num:
-        return {"app": result["app"] or "notepad", "action": "delete_line", "line": int(match_del_line_num.group(1))}
-    elif "delete" in cmd:
-        target = cmd.replace("delete", "").replace("word", "").strip()
-        return {"app": result["app"] or "notepad", "action": "delete", "text": target}
-    
     match_replace = re.search(r"(?:replace|change|swap|turn) (.*?) (?:with|to|for|into) (.*)", cmd)
-    if match_replace:
-        return {"app": result["app"] or "notepad", "action": "replace", "old_text": match_replace.group(1).strip(), "new_text": match_replace.group(2).strip()}
+    if match_replace: return {"app": result["app"] or "notepad", "action": "replace", "old_text": match_replace.group(1).strip(), "new_text": match_replace.group(2).strip()}
 
-    # 5. INSERT
-    match_ins_line = re.search(r"(?:insert|add|put|squeeze) (.*?) (?:at|on|in|into) line (\d+)", cmd)
-    if match_ins_line:
-        return {"app": result["app"] or "notepad", "action": "insert", "text": match_ins_line.group(1).strip(), "line": int(match_ins_line.group(2))}
-    elif re.search(r'\b(?:insert|add)\b', cmd):
-        # Use re.sub to safely remove the standalone word "insert" or "add"
-        text = re.sub(r'\b(?:insert|add)\b', '', cmd).strip()
-        return {"app": result["app"] or "notepad", "action": "insert", "text": text}
+    match_del_line_word = re.search(r"(?:delete|remove) word (.*?) from line (\d+)", cmd)
+    if match_del_line_word: return {"app": result["app"] or "notepad", "action": "delete", "text": match_del_line_word.group(1).strip(), "line": int(match_del_line_word.group(2))}
     
-    # 6. FORMATTING / MOVEMENT
+    match_del_line = re.search(r"(?:delete|remove) line (\d+)", cmd)
+    if match_del_line: return {"app": result["app"] or "notepad", "action": "delete_line", "line": int(match_del_line.group(1))}
+    
+    match_del_word = re.search(r"(?:delete|remove)(?: word)? (.*)", cmd)
+    if match_del_word: return {"app": result["app"] or "notepad", "action": "delete", "text": match_del_word.group(1).strip()}
+
+    match_ins_line = re.search(r"(?:insert|add|put) (.*?) (?:at|on|in) line (\d+)", cmd)
+    if match_ins_line: return {"app": result["app"] or "notepad", "action": "insert", "text": match_ins_line.group(1).strip(), "line": int(match_ins_line.group(2))}
+    
+    match_ins = re.search(r"(?:insert|add) (.*)", cmd)
+    if match_ins: return {"app": result["app"] or "notepad", "action": "insert", "text": match_ins.group(1).strip()}
+
     if "undo" in cmd: return {"app": result["app"] or "notepad", "action": "undo"}
     elif "redo" in cmd: return {"app": result["app"] or "notepad", "action": "redo"}
     elif "new paragraph" in cmd: return {"app": result["app"] or "notepad", "action": "new_paragraph"}
     elif "new line" in cmd: return {"app": result["app"] or "notepad", "action": "new_line"}
     elif "space" in cmd: return {"app": result["app"] or "notepad", "action": "space"}
-    elif "move" in cmd:
-        for direction in ["left", "right", "up", "down"]:
-            if direction in cmd: return {"app": result["app"] or "notepad", "action": "move", "direction": direction}
-
-    # 7. UTILITY
-    if "clear" in cmd or "empty" in cmd: return {"app": result["app"] or "notepad", "action": "clear"}
-    elif "new file" in cmd or "create file" in cmd: return {"app": result["app"] or "notepad", "action": "new"}
+    elif "clear" in cmd or "empty" in cmd: return {"app": result["app"] or "notepad", "action": "clear"}
+    elif "new tab" in cmd: return {"app": "notepad", "action": "new_tab"}
+    elif "new file" in cmd: return {"app": "notepad", "action": "new"}
     elif "read" in cmd and "unread" not in cmd and "message" not in cmd: return {"app": result["app"] or "notepad", "action": "read"}
-    
+
     # =========================================
     # 💬 SPOTIFY
     # =========================================
     if result["app"] == "spotify":
-        # Explicitly catch 'open' so it never goes to the LLM
         
-        # 🔥 THE MOOD MAPPING
         mood_map = {
-            "sad": ["sad", "low", "depressed", "heartbreak"],
-            "party": ["party", "dance", "club", "vibes"],
-            "chill": ["chill", "relax", "study", "lofi", "flow"],
+            "sad": ["sad", "low", "depressed", "heartbreak", "cry"],
+            "party": ["party", "dance", "club", "vibes", "fun"],
+            "chill": ["chill", "relax", "study", "lofi", "flow", "calm"],
             "romantic": ["love", "romantic", "date"],
             "energy": ["gym", "workout", "energy", "power"]
         }
-        
         query_map = {
             "sad": "Sad Songs for Soul",
-            "party": "Top Party Hits 2026",
+            "party": "Top Party Hits",
             "chill": "Lofi Hip Hop Radio - Beats to Relax/Study to",
             "romantic": "Romantic Evening Playlist",
             "energy": "High Energy Workout Mix"
         }
 
-        # Check for mood keywords
         for mood, keywords in mood_map.items():
             if any(word in cmd for word in keywords):
-                print(f"🎵 JARVIS: Selecting a {mood} playlist for your current vibe.")
                 return {"app": "spotify", "action": "play", "text": query_map[mood]}
         
-        # Fallback for "play something as per your mood"
-        if "your mood" in cmd or "you like" in cmd:
-            print("🤖 JARVIS: Choosing my 'Digital Flow' mix for us.")
-            return {"app": "spotify", "action": "play", "text": "Sture Zetterberg Mix"}
-        
-        if "open" in cmd:
-            return {"app": "spotify", "action": "open"}
-        
-        # Explicitly catch 'close'
-        if "close" in cmd:
-            return {"app": "spotify", "action": "close"}
+        if "your mood" in cmd or "you like" in cmd: return {"app": "spotify", "action": "play", "text": "Sture Zetterberg Mix"}
+        if "open" in cmd: return {"app": "spotify", "action": "open"}
+        if "close" in cmd: return {"app": "spotify", "action": "close"}
    
-    if "like" in cmd:
-        return {"app": "spotify", "action": "like"} # Matches execute_action key
-    
-    mood_map = {"sad": ["sad", "low", "cry", "depressed"], "party": ["party", "dance", "fun"], "chill": ["chill", "relax", "calm"], "romantic": ["love", "romantic"], "energy": ["gym", "workout", "energy"]}
-    query_map = {"sad": "sad songs playlist", "party": "party songs playlist", "chill": "chill music", "romantic": "romantic songs", "energy": "workout music"}
-    for mood, words in mood_map.items():
-        if any(word in cmd for word in words): return {"app": "spotify", "action": "play", "text": query_map[mood]}
+    if "like" in cmd: return {"app": "spotify", "action": "like"} 
 
-    if "play" in cmd or "listen" in cmd:
-        text = cmd
-        for word in ["play", "listen", "to", "song", "music", "please", "can you", "i want", "me"]: text = text.replace(word, "")
-        if text.strip(): return {"app": "spotify", "action": "play", "text": text.strip()}
+    match_play = re.search(r"(?:play|listen to) (.*?)(?: on spotify)?$", raw_text_command, re.IGNORECASE)
+    if match_play:
+        clean_song = match_play.group(1).strip()
+        if clean_song: return {"app": "spotify", "action": "play", "text": clean_song}
 
     if "pause" in cmd: return {"app": "spotify", "action": "pause"}
-    if "resume" in cmd or "play" == cmd: return {"app": "spotify", "action": "resume"}
+    if "resume" in cmd or cmd == "play": return {"app": "spotify", "action": "resume"}
     if "next" in cmd: return {"app": "spotify", "action": "next"}
     if "previous" in cmd: return {"app": "spotify", "action": "previous"}
-    if "mute" in cmd: return {"app": "spotify", "action": "mute"}
-    if "volume up" in cmd: return {"app": "spotify", "action": "volume_up"}
-    if "volume down" in cmd: return {"app": "spotify", "action": "volume_down"}
         
     # =========================================
     # 🧮 CALCULATOR 
@@ -397,8 +339,10 @@ def process_nlp(command, current_app="notepad"):
     
     if re.search(r"\b(square|root|factorial|pi|power)\b", cmd): return {"app": "calculator", "action": "calculate", "expression": None}
     
-    if any(word in cmd for word in ["calculate", "what is", "+", "-", "*", "/", "divide", "multiply"]):
-        expr = cmd.replace("plus", "+").replace("minus", "-").replace("multiply", "*").replace("multiplied by", "*").replace("x", "*").replace("divide", "/").replace("divided by", "/")
+    match_calc = re.search(r"(?:calculate|what is|whats) (.*)", cmd)
+    if match_calc or any(word in cmd for word in ["+", "-", "*", "/", "divide", "multiply"]):
+        expr = match_calc.group(1) if match_calc else cmd
+        expr = expr.replace("plus", "+").replace("minus", "-").replace("multiply", "*").replace("multiplied by", "*").replace("x", "*").replace("divide", "/").replace("divided by", "/")
         expr = re.sub(r"[a-zA-Z]", "", expr).strip()
         return {"app": "calculator", "action": "calculate", "expression": expr}
     
@@ -407,80 +351,44 @@ def process_nlp(command, current_app="notepad"):
     # =========================================
     if "open whatsapp" in cmd: return {"app": "whatsapp", "action": "open"}
     elif "close whatsapp" in cmd: return {"app": "whatsapp", "action": "close"}
-    elif "read message from" in cmd or "read messages from" in cmd:
-        contact_name = cmd.split("from")[-1].strip()
-        return {"app": "whatsapp", "action": "read_specific", "contact": contact_name}
-    elif "show unread" in cmd or "see unread" in cmd: 
-        return {"app": "whatsapp", "action": "show_unread"}
-    elif "voice message" in cmd or "voice note" in cmd:
-        match = re.search(r"voice (?:message|note)(?: to)? (.+)", cmd)
-        return {"app": "whatsapp", "action": "voice_note", "contact": match.group(1).strip() if match else None}   
-    elif "stop recording" in cmd or "stop voice" in cmd: return {"app": "whatsapp", "action": "stop_voice"}
-    elif "message to" in cmd or "whatsapp to" in cmd:
-        match = re.search(r"to (.*?)(?: saying| that says|:|,| ) (.*)", cmd)
-        if match: return {"app": "whatsapp", "action": "send_to", "contact": match.group(1).strip(), "text": match.group(2).strip()}
-        else: return {"app": "whatsapp", "action": "send_to", "contact": cmd.split("to")[-1].strip(), "text": ""}
-    elif "send message" in cmd: return {"app": "whatsapp", "action": "send", "text": cmd.split("message", 1)[-1].strip()}
-    elif "send screenshot to" in cmd: return {"app": "whatsapp", "action": "screenshot", "contact": cmd.split("to")[-1].strip()}
-    elif "video call" in cmd: return {"app": "whatsapp", "action": "video_call", "contact": cmd.replace("video call", "").strip()}
-    elif "voice call" in cmd or "call" in cmd: return {"app": "whatsapp", "action": "voice_call", "contact": cmd.replace("voice call", "").replace("call", "").strip()}
-    if "mute" in command and "call" in command: return {"app": "system", "action": "mute_mic"}
-    if "unmute" in command: return {"app": "system", "action": "unmute_mic"}
-    elif "read my last message" in cmd: return {"app": "whatsapp", "action": "read_my"}
-    if "end call" in command or "cut call" in command: return {"app": "whatsapp", "action": "end_call"}
-    if "status" in command: return {"app": "whatsapp", "action": "open_status", "contact": command.split()[-1]}
-    if "read" in cmd and "message" in cmd:
-        words = cmd.split()
-        contact = words[words.index("from") + 1] if "from" in words and words.index("from") + 1 < len(words) else None
-        return {"app": "whatsapp", "action": "read", "contact": contact, "count": 3}
-    elif "send contact" in cmd and "to" in cmd:
-        try:
-            contact_to_share, target_person = cmd.split("send contact ")[1].split(" to ")
-            return {"app": "whatsapp", "action": "send_contact_card", "target": target_person.strip(), "share_name": contact_to_share.strip()}
-        except: pass
-    elif "send" in cmd and "to" in cmd:
-        try:
-            location = "desktop" if "from desktop" in cmd else "downloads" if "from downloads" in cmd else "documents" if "from documents" in cmd else None
-            cmd_clean = cmd.replace("from desktop", "").replace("from downloads", "").replace("from documents", "").strip()
-            spoken_file, contact = cmd_clean.split("send ")[1].split(" to ")
-            clean_file = spoken_file.replace("file ", "").replace("attachment ", "").replace("document ", "").strip()
-            return {"app": "whatsapp", "action": "send_attachment", "contact": contact.strip(), "file_name": clean_file, "location": location}
-        except: pass
     
-  
-    # =========================================
-    # 📂 STEP 2: FILE SYSTEM (PRIORITY OVERRIDE)
-    # =========================================
-    # 🔥 PLACE THIS BEFORE ANY OTHER ACTION CHECKS!
-    if result["app"] == "file_system":
-        
-        if "create folder" in cmd or "make folder" in cmd: 
-            return {"app": "file_system", "intent": "create_folder", "entities": {"path": cmd.replace("create folder", "").replace("make folder", "").strip()}}
-        
-        elif "create file" in cmd or "make file" in cmd: 
-            return {"app": "file_system", "intent": "create_file", "entities": {"path": cmd.replace("create file", "").replace("make file", "").strip()}}
-        
-        elif "delete folder" in cmd:
-            return {"app": "file_system", "intent": "delete_folder", "entities": {"path": cmd.replace("delete folder", "").strip()}}
-            
-        elif "delete file" in cmd or "delete" in cmd:
-            return {"app": "file_system", "intent": "delete_file", "entities": {"path": cmd.replace("delete file", "").replace("delete", "").strip()}}
+    match_read_specific = re.search(r"(?:read|check)(?: my)? messages? from (.*)", cmd)
+    if match_read_specific: return {"app": "whatsapp", "action": "read_specific", "contact": match_read_specific.group(1).strip()}
+    
+    elif "show unread" in cmd or "see unread" in cmd: return {"app": "whatsapp", "action": "show_unread"}
+    
+    match_voice_note = re.search(r"(?:send )?voice (?:message|note)(?: to)? (.*)", cmd)
+    if match_voice_note: return {"app": "whatsapp", "action": "voice_note", "contact": match_voice_note.group(1).strip()}   
+    
+    elif "stop recording" in cmd or "stop voice" in cmd: return {"app": "whatsapp", "action": "stop_voice"}
+    
+    # "Send message to Shraddha saying hello there"
+    # 🔥 THE FIX: Strips 'message to' or 'whatsapp to' from the contact name
+    match_send_saying = re.search(r"(?:send|message|whatsapp)(?:\s+a\s+message)?(?:\s+to)?\s+(.*?)(?:\s+saying|\s+that\s+says|:|$) (.*)", raw_text_command, re.IGNORECASE)
+    if match_send_saying:
+        contact = match_send_saying.group(1).strip()
+        # Remove 'message to' if it accidentally got caught
+        contact = re.sub(r'^(message to|whatsapp to|to)\s+', '', contact, flags=re.IGNORECASE)
+        return {"app": "whatsapp", "action": "send_to", "contact": contact, "text": match_send_saying.group(2).strip()}
 
-        elif "search for" in cmd or "find file" in cmd: 
-            return {"app": "file_system", "intent": "search_file", "entities": {"filename": cmd.replace("search for", "").replace("find file", "").strip(), "directory": os.path.expanduser("~")}}
+    match_send = re.search(r"send message (.*)", raw_text_command, re.IGNORECASE)
+    if match_send: return {"app": "whatsapp", "action": "send", "text": match_send.group(1).strip()}
+    
+    match_screenshot = re.search(r"send screenshot to (.*)", cmd)
+    if match_screenshot: return {"app": "whatsapp", "action": "screenshot", "contact": match_screenshot.group(1).strip()}
+    
+    match_video_call = re.search(r"video call (.*)", cmd)
+    if match_video_call: return {"app": "whatsapp", "action": "video_call", "contact": match_video_call.group(1).strip()}
+    
+    match_voice_call = re.search(r"(?:voice call|call) (.*)", cmd)
+    if match_voice_call: return {"app": "whatsapp", "action": "voice_call", "contact": match_voice_call.group(1).strip()}
+    
+    if "status" in cmd: return {"app": "whatsapp", "action": "open_status", "contact": cmd.split()[-1]}
+    
+    match_contact_card = re.search(r"send contact (.*) to (.*)", cmd)
+    if match_contact_card: return {"app": "whatsapp", "action": "send_contact_card", "share_name": match_contact_card.group(1).strip(), "target": match_contact_card.group(2).strip()}
+    
+    match_attachment = re.search(r"send (?:file|document|attachment) (.*) (?:from|in) (desktop|downloads|documents) to (.*)", cmd)
+    if match_attachment: return {"app": "whatsapp", "action": "send_attachment", "file_name": match_attachment.group(1).strip(), "location": match_attachment.group(2).strip(), "contact": match_attachment.group(3).strip()}
 
-        elif "move" in cmd and "to" in cmd:
-            parts = cmd.replace("move file", "").replace("move folder", "").replace("move", "").split(" to ")
-            if len(parts) == 2:
-                return {"app": "file_system", "intent": "move_file", "entities": {"source": parts[0].strip(), "destination": parts[1].strip()}}
-                
-        elif "copy" in cmd and "to" in cmd:
-            parts = cmd.replace("copy file", "").replace("copy folder", "").replace("copy", "").split(" to ")
-            if len(parts) == 2:
-                return {"app": "file_system", "intent": "copy_file", "entities": {"source": parts[0].strip(), "destination": parts[1].strip()}}
-
-        elif "rename" in cmd and "to" in cmd:
-            parts = cmd.replace("rename file", "").replace("rename folder", "").replace("rename", "").split(" to ")
-            if len(parts) == 2:
-                return {"app": "file_system", "intent": "rename_file", "entities": {"old_path": parts[0].strip(), "new_path": parts[1].strip()}}
     return result

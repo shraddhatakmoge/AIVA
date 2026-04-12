@@ -5,16 +5,38 @@ import pygetwindow as gw
 import win32com.client
 from common import close_app
 
+
+# -------- FOCUS POWERPOINT --------
 # -------- FOCUS POWERPOINT --------
 def focus_pp():
+    # Look for PowerPoint windows
     windows = gw.getWindowsWithTitle("PowerPoint")
+    
     for win in windows:
-        try:
-            if win.isMinimized: win.restore()
-            win.activate()
-            return True
-        except: continue
-    return False
+        # 🔥 THE FIX: Ignore off-screen ghost windows and 0x0 processes
+        if win.width > 10 and win.left > -10000: 
+            try:
+                if win.isMinimized:
+                    win.restore()
+                
+                # 🛡️ THE BYPASS: Press Alt to trick Windows security
+                pyautogui.press('alt')
+                time.sleep(0.1)
+                
+                win.activate()
+                # ⌨️ THE ESCAPE: Drops any menu highlights caused by the Alt key
+                pyautogui.press('esc')
+                time.sleep(0.2)
+                return win
+            except Exception as e:
+                print(f"⚠️ JARVIS: Could not focus PowerPoint: {e}")
+                continue
+
+    # If no physical window is found, launch it
+    print("🚀 JARVIS: PowerPoint not found in foreground. Launching...")
+    os.system("start powerpnt")
+    time.sleep(2)
+    return None
 
 # -------- OPEN --------
 def open_powerpoint():

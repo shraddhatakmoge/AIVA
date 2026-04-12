@@ -85,6 +85,8 @@ def write_in_word(text):
     else:
         print("❌ Word is not open! Please open Word first.")
 
+
+
 # -------- 5 & 6. SAVE (NAME & SPECIFIC FOLDER) --------
 def save_word_file(file_name, folder_path=None):
     """
@@ -214,45 +216,66 @@ word_colors = {
 }
 
 # -------- 11. STYLE SPECIFIC (SMART ENGINE) --------
-def style_specific_text(target_text, style=None, color=None, size=None):
-    """
-    Portable Multi-Word Formatting: Loops through words using shortcuts.
-    """
-    if not target_text: return
-    
-    # If it's a single word string, turn it into a list for the loop
-    if isinstance(target_text, str):
-        target_text = [target_text]
-        
+def style_specific_text(target_text=None, style=None, color=None, size=None):
     focus_word()
-    time.sleep(0.5)
+    
+    word_colors = {
+        "black": 1, "blue": 2, "green": 11, "pink": 5, 
+        "purple": 12, "red": 6, "yellow": 7, "white": 8, "orange": 14
+    }
 
-    for word in target_text:
-        print(f"🎨 JARVIS: Formatting '{word}'...")
+    try:
+        # Connect to the running Word instance
+        word_app = win32com.client.GetActiveObject("Word.Application")
+        word_app.Visible = True # Ensure it's visible
         
-        # 1. Open 'Find' tool
-        pyautogui.hotkey('ctrl', 'f')
-        time.sleep(0.6) # Slightly longer for stability
-        
-        # 2. Clear old search, type word, and Select
-        pyautogui.hotkey('ctrl', 'a')
-        pyautogui.press('backspace')
-        pyautogui.write(word, interval=0.05)
-        pyautogui.press('enter')
-        time.sleep(0.5)
-        
-        # 3. Escape to focus document
-        pyautogui.press('esc') 
-        time.sleep(0.3)
+        # We will work with the current selection/range
+        if target_text:
+            if isinstance(target_text, str): target_text = [target_text]
+            
+            for word in target_text:
+                print(f"🎨 JARVIS: Searching for and formatting '{word}'...")
+                
+                # Start search from the beginning of the document
+                find_obj = word_app.ActiveDocument.Content.Find
+                find_obj.ClearFormatting()
+                
+                # 🔥 THE STABILIZER: Wrap=1 means search the entire document
+                # Forward=True, MatchCase=False
+                found = find_obj.Execute(word, False, False, False, False, False, True, 1)
+                
+                if found:
+                    # Use the range of the found word
+                    rng = find_obj.Parent 
+                    
+                    if style == "bold": rng.Font.Bold = True
+                    if style == "italic": rng.Font.Italic = True
+                    if style == "underline": rng.Font.Underline = 1
+                    
+                    if color and color.lower() in word_colors:
+                        rng.Font.ColorIndex = word_colors[color.lower()]
+                        
+                    if size:
+                        rng.Font.Size = size
+                    
+                    print(f"✅ JARVIS: Successfully formatted '{word}'")
+                else:
+                    print(f"❌ JARVIS: Could not find the word '{word}'")
 
-        # 4. Apply Shortcut
-        if style == "bold": pyautogui.hotkey('ctrl', 'b')
-        elif style == "italic": pyautogui.hotkey('ctrl', 'i')
-        elif style == "underline": pyautogui.hotkey('ctrl', 'u')
-        
-        time.sleep(0.2) # Small pause between words
+        else:
+            # If no specific word, apply to whatever is currently highlighted
+            print("🎨 JARVIS: Applying to current selection...")
+            sel = word_app.Selection
+            if style == "bold": sel.Font.Bold = True
+            if style == "italic": sel.Font.Italic = True
+            if style == "underline": sel.Font.Underline = 1
+            if color and color.lower() in word_colors:
+                sel.Font.ColorIndex = word_colors[color.lower()]
+            if size:
+                sel.Font.Size = size
 
-    print(f"✅ JARVIS: Finished applying {style} to all requested words.")
+    except Exception as e:
+        print(f"❌ JARVIS: Word API Error: {e}")
         
 # ==========================================
 # 🧠 ADVANCED WORD FEATURES (From Notepad)

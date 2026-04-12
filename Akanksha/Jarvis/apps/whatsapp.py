@@ -4,7 +4,6 @@ import pyautogui
 import pygetwindow as gw
 import pyperclip
 import pyttsx3
-import threading
 
 
 

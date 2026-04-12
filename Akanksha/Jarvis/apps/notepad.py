@@ -20,27 +20,16 @@ pyautogui.PAUSE = 0.1
 
 # -------- OPEN --------
 def open_notepad():
-    # 1. Look for any existing Notepad windows first
-    windows = gw.getWindowsWithTitle("Notepad")
-    
-    for win in windows:
-        try:
-            # Try to activate it. If it's a ghost, this throws an error.
-            if win.isMinimized:
-                win.restore()
-            win.activate()
-            return win # Success! Stop here.
-        except:
-            # It was a ghost window, ignore it and keep looking
-            continue 
-            
-    # 2. If we get here, there are no valid windows. Let's open one!
+    print("🚀 Launching Notepad...")
     os.system("start notepad")
-    time.sleep(2)
+    time.sleep(2) # Give Windows time to render the UI
     
-    # 3. Grab the new window so JARVIS can use it
-    return focus_notepad()
-
+    # Grab the newly opened window safely
+    windows = gw.getWindowsWithTitle("Notepad")
+    for win in windows:
+        if win.width > 10 and win.left > -10000:
+            return win
+    return None
 
 # ---------- CLOSE ---------
 def close_notepad():
@@ -50,18 +39,31 @@ def close_notepad():
 # -------- FOCUS --------
 def focus_notepad():
     windows = gw.getWindowsWithTitle("Notepad")
-
+    
     for win in windows:
-        try:
-            if win.isMinimized:
-                win.restore()
-            win.activate()
-            time.sleep(0.2)
-            return win
-        except:
-            continue
+        if win.width > 10 and win.left > -10000: 
+            try:
+                if win.isMinimized:
+                    win.restore()
+                
+                # 1. Press Alt to trick Windows security
+                pyautogui.press('alt')
+                time.sleep(0.1)
+                
+                # 2. Bring to front
+                win.activate()
+                time.sleep(0.2)
+                
+                # 3. 🔥 THE FIX: Press Escape to drop the "File" menu highlight
+                pyautogui.press('esc')
+                time.sleep(0.1)
+                
+                return win
+            except Exception as e:
+                print(f"⚠️ Could not focus window: {e}")
+                continue
 
-    # If JARVIS tries to focus but Notepad is completely closed, open it for the user
+    # If no visible window exists on the actual monitor, open it!
     return open_notepad()
 
 def click_inside_notepad(win):
@@ -72,20 +74,37 @@ def click_inside_notepad(win):
         time.sleep(0.3)
 
 
-# -------- WRITE --------
-def write_text(text):
-    win = focus_notepad() # Get the window object
+# ------ NEW TAB ------
+def new_tab():
+    win = focus_notepad()
     if win:
-        # Click the middle of the Notepad window to set the cursor
-        x = win.left + win.width // 2
-        y = win.top + win.height // 2
-        pyautogui.click(x, y)
+        # 1. Force a physical click inside the window to steal keyboard focus from the terminal
+        click_inside_notepad(win)
+        
+        # 2. Give Windows a split second to register the focus change
         time.sleep(0.2)
         
-        # Now type
-        pyautogui.write(text, interval=0.01)
-        print(f"✅ Typed: {text}")
+        # 3. Fire the shortcut
+        pyautogui.hotkey("ctrl", "n")
+        print("✅ Opened a new tab in Notepad")
 
+# -------- WRITE --------
+def write_text(text):
+    win = focus_notepad() 
+    if win:
+        # 1. Wait for Windows 11's window animation to fully finish
+        time.sleep(0.4) 
+        
+        # 2. Force a physical click inside the window to steal the cursor
+        click_inside_notepad(win)
+        
+        # 3. 🔥 THE FIX: Instant Clipboard Paste! 
+        # This is 100x faster and immune to Terminal focus-stealing
+        pyperclip.copy(text)
+        time.sleep(0.1)
+        pyautogui.hotkey("ctrl", "v")
+        
+        print(f"✅ Typed: {text}")
 # ------ NEW FILe ------
 def new_file():
     win = focus_notepad()
