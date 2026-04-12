@@ -104,8 +104,28 @@ def handle_file_command(intent, entities):
             return search_by_extension(directory, entities["extension"])
         
         elif intent == "open_item":
-            path = resolve_path(entities["path"])
-            return open_item(path)
+            target = entities["path"]
+            
+            # 1. Try the direct Desktop path first (This keeps folder opening fast!)
+            direct_path = resolve_path(target)
+            if os.path.exists(direct_path):
+                return open_item(direct_path)
+                
+            # 2. If it is NOT directly on the Desktop, use the smart scanner!
+            from common import find_document
+            
+            print(f"👀 JARVIS: '{target}' not on main Desktop. Initiating smart search...")
+            real_path = find_document(target)
+            
+            if real_path:
+                # If the scanner finds it, open the exact path it found
+                return open_item(real_path)
+            else:
+                return {
+                    "status": "error",
+                    "message": f"Could not find '{target}' directly or via smart search.",
+                    "data": None
+                }
 
         else:
             return {

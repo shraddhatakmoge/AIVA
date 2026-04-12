@@ -141,3 +141,77 @@ def resolve_contact(spoken_name):
     clean_name = spoken_name.strip()
     
     return clean_name
+
+import os
+
+# -------- DEEP SYSTEM SCAN (WITH OR WITHOUT ONEDRIVE) --------
+def deep_scan_document(spoken_name, include_onedrive=False):
+    """
+    Scans the entire User Profile instead of just 3 folders.
+    Portable: Uses '~' so it works on any computer without hardcoding paths.
+    """
+    user_profile = os.path.expanduser("~")
+    onedrive_path = os.path.join(user_profile, "OneDrive")
+    
+    # If you TRULY want to scan the whole C: drive, change base_path to "C:\\"
+    # But user_profile is 100x faster and safer!
+    base_path = user_profile 
+
+    spoken_lower = spoken_name.lower().strip()
+    found_files = []
+
+    print(f"🔍 JARVIS: Initiating DEEP SCAN for '{spoken_name}'...")
+    if not include_onedrive:
+        print("🚫 JARVIS: Bypassing OneDrive...")
+
+    # Walk through every single folder inside the base path
+    for root, dirs, files in os.walk(base_path):
+        
+        # ⚡ SPEED OPTIMIZATION: Skip hidden app data which takes forever to scan
+        if "AppData" in root or "Application Data" in root:
+            continue
+            
+        # ☁️ ONEDRIVE FILTER: Skip OneDrive folders if the switch is False
+        if not include_onedrive and onedrive_path in root:
+            continue
+
+        # Look for the file
+        for file in files:
+            if spoken_lower in file.lower() or spoken_lower.replace(" ", "_") in file.lower():
+                found_files.append(os.path.join(root, file))
+
+    # Remove duplicates
+    found_files = list(set(found_files))
+
+    # ==========================================
+    # 🧠 THE SELECTION MENU
+    # ==========================================
+    if len(found_files) == 0:
+        print(f"❌ Could not find '{spoken_name}' anywhere on the system.")
+        return None
+        
+    elif len(found_files) == 1:
+        print(f"✅ Found exactly one match: {found_files[0]}")
+        return found_files[0]
+        
+    else:
+        print(f"\n⚠️ Deep Scan found {len(found_files)} files matching '{spoken_name}':")
+        for index, path in enumerate(found_files):
+            print(f"  [{index + 1}] {path}")
+            
+        while True:
+            choice = input("\n👉 Enter the file number (or say 'cancel'): ").strip().lower()
+            
+            if choice in ['0', 'cancel', 'stop', 'abort', 'exit', 'nevermind', 'no']:
+                print("❌ Attachment cancelled.")
+                return None
+                
+            try:
+                idx = int(choice) - 1
+                if 0 <= idx < len(found_files):
+                    print(f"✅ Selected: {found_files[idx]}")
+                    return found_files[idx]
+                else:
+                    print("❌ Invalid number. Please pick a number from the list.")
+            except ValueError:
+                print("❌ Please enter a valid number or say 'cancel'.")

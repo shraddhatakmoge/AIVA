@@ -453,23 +453,7 @@ def send_attachment(contact, filename, search_location=None):
     
     print(f"✅ JARVIS: Document sent to {contact}")
     
-    # 1. Wait longer for the Preview screen to appear
-    print("⏳ JARVIS: Waiting for file preview...")
-    time.sleep(4) 
-    
-    # 2. RE-FOCUS WHATSAPP (Crucial: The Dialog closure steals focus!)
-    focus_whatsapp() 
-    time.sleep(0.5)
-
-    # 3. Press TAB once
-    # This moves focus from the 'Add a caption' box to the actual 'Send' button
-    pyautogui.press("tab")
-    time.sleep(0.3)
-
-    # 4. Final Send
-    pyautogui.press("enter")
-    
-    print(f"✅ JARVIS: Document '{filename}' sent to {contact}")
+   
    
    
 # -------- SEND CONTACT CARD --------
@@ -533,6 +517,7 @@ def send_contact_card(target_person, contact_to_share):
     
 # -------- READ LATEST MESSAGE FROM SPECIFIC PERSON --------
 def read_specific_message(contact):
+    print(f"🔍 JARVIS: Retrieving latest messages from {contact}...")
     focus_whatsapp()
     time.sleep(1)
 
@@ -555,21 +540,24 @@ def read_specific_message(contact):
     pyautogui.press("enter")
     time.sleep(1.5) # Wait for chat to open
 
-    # 4. Copy the messages using a FAST Loop!
+    # 4. Copy the messages using a Loop!
     all_messages = []
     
-    # Jump backwards 3 times (⚡ FAST)
+    # Jump backwards 3 times to safely reach the message history
     for _ in range(3):
         pyautogui.hotkey("shift", "tab") 
-        time.sleep(0.05) # Sped up from 0.2
+        time.sleep(0.2)
     
-    # 🔥 THE FAST LOOP FIX: Try to read up to 5 messages in a row
+    # 🔥 THE LOOP FIX: Try to read up to 5 messages in a row
     for _ in range(5):
         pyperclip.copy("EMPTY_MARKER")
         
-        # ⚡ Fire all 4 bypass keys instantly in one sequence!
-        pyautogui.press(['right', 'enter', 'down', 'enter'], interval=0.02)
-        time.sleep(0.1) # Sped up from 0.3. Just enough time for WhatsApp to copy to clipboard.
+        # Your custom UI bypass logic to copy ONE message
+        pyautogui.press("right")
+        pyautogui.press("enter")
+        pyautogui.press("down")
+        pyautogui.press("enter")
+        time.sleep(0.3)
         
         current_msg = pyperclip.paste()
         
@@ -582,7 +570,7 @@ def read_specific_message(contact):
         
         # Press Down to move the highlight to the next message bubble!
         pyautogui.press("down")
-        time.sleep(0.05) # Sped up from 0.2
+        time.sleep(0.2)
 
     # Combine all the messages we collected into one clean paragraph
     text = "\n".join(all_messages)
@@ -601,9 +589,9 @@ def read_specific_message(contact):
     # speak(f"Here are your messages from {contact}")
     
     # Return focus to the typing box to reset the UI state
-    # ⚡ Rapid-fire reset back to the typing box
-    pyautogui.press(['tab', 'tab', 'tab'], interval=0.02) 
-
+    for _ in range(3):
+        pyautogui.press("tab")
+        time.sleep(0.1)
 
 # ------ SHOW UNREAD MESSAGES (FILTER ONLY) --------
 

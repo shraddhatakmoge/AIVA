@@ -41,7 +41,7 @@ def process_nlp(command, current_app="notepad"):
         result["app"] = "spotify"
     elif "notepad" in cmd:
         result["app"] = "notepad"
-    elif any(x in cmd for x in ["file", "folder", "directory", "document"]) and not any(x in cmd for x in ["open file", "send "]) and result["app"] != "word":
+    elif any(x in cmd for x in ["file", "folder", "directory", "document"]) and not any(x in cmd for x in ["send "]) and result["app"] != "word":
         result["app"] = "file_system"
     elif any(x in cmd for x in ["powerpoint", "presentation","ppt", "slide", "slideshow"]):
         result["app"] = "powerpoint"
@@ -59,6 +59,9 @@ def process_nlp(command, current_app="notepad"):
     # 📂 STEP 3: FILE SYSTEM (FLEXIBLE REGEX)
     # =========================================
     if result["app"] == "file_system":
+        
+        match_open = re.search(r"(?:open|launch)(?: file| folder)? (.*)", cmd)
+        if match_open: return {"app": "file_system", "intent": "open_item", "entities": {"path": match_open.group(1).strip()}}
         
         match_folder = re.search(r"(?:create|make|generate)(?: folder| directory)(?: called| named)? (.*)", cmd)
         if match_folder: return {"app": "file_system", "intent": "create_folder", "entities": {"path": match_folder.group(1).strip()}}
@@ -98,9 +101,7 @@ def process_nlp(command, current_app="notepad"):
         match_rename = re.search(r"(?:rename|change name of) (.*) to (.*)", cmd)
         if match_rename: return {"app": "file_system", "intent": "rename_file", "entities": {"old_path": match_rename.group(1).strip(), "new_path": match_rename.group(2).strip()}}
 
-        match_open = re.search(r"(?:open|launch)(?: file| folder)? (.*)", cmd)
-        if match_open: return {"app": "file_system", "intent": "open_item", "entities": {"path": match_open.group(1).strip()}}
-
+        
     # =========================================
     # 📊 POWERPOINT LOGIC
     # =========================================
