@@ -547,7 +547,7 @@ def is_nlp_confident(data):
 
     # If BOTH are None, the NLP failed to understand the command
     if action is None and intent is None:
-        print("   🔍 DEBUG: Action/Intent is None. NLP is NOT confident. Sending to LLM...")
+        # print("   🔍 DEBUG: Action/Intent is None. NLP is NOT confident. Sending to LLM...")
         return False
         
     return True
@@ -583,7 +583,7 @@ def process_command(command):
             
         # 2. Try Local NLP
         nlp_data = process_nlp(part, CURRENT_APP_STATE) 
-        print("📊 NLP RESULT:", nlp_data)   
+        # print("📊 NLP RESULT:", nlp_data)   
         
         # 3. Decision Logic
         confident = is_nlp_confident(nlp_data)
@@ -597,7 +597,7 @@ def process_command(command):
 # ▶️ RUN
 # ==============================
 if __name__ == "__main__":
-    print("🤖 JARVIS started...")
+    # print("🤖 JARVIS started...")
     
 
     while True:

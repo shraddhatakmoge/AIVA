@@ -15,6 +15,7 @@ STOP_RECORDING = False
 
 # -------- OPEN --------
 def open_whatsapp():
+    print("Opening Whatsapp for you")
     
     # 1. Build the dynamic paths where the .exe is typically installed
     local_appdata = os.environ.get("LOCALAPPDATA", "")
@@ -39,6 +40,7 @@ def open_whatsapp():
 
 # -------- CLOSE --------
 def close_whatsapp():
+    print("Closing Whatsapp")
 
 
     # Try process kill
@@ -47,7 +49,7 @@ def close_whatsapp():
     # Fallback: close by window title
     os.system('taskkill /f /fi "WINDOWTITLE eq WhatsApp*" >nul 2>&1')
 
-    print("✅ WhatsApp closed")
+    # print("✅ WhatsApp closed")
 
 # -------- FOCUS --------
 def focus_whatsapp():
@@ -69,6 +71,7 @@ def focus_whatsapp():
 
 # -------- SEND --------
 def send_message(text):
+    print("Sending message")
     global last_message
 
     focus_whatsapp()
@@ -78,13 +81,13 @@ def send_message(text):
     pyautogui.press("enter")
 
     last_message = text
-    print("📤 Sent:", text)
+    # print("📤 Sent:", text)
 
 
 # -------- SEND TO CONTACT --------
 def send_message_to(contact, text):
     global last_message
-
+    print(f"Sending message to {contact}")
     focus_whatsapp()
     time.sleep(2)
 
@@ -102,7 +105,7 @@ def send_message_to(contact, text):
     pyautogui.press("enter")
 
     last_message = text
-    print(f"📤 Sent to {contact}: {text}")
+    # print(f"📤 Sent to {contact}: {text}")
 
 
 # =========================================
@@ -149,16 +152,16 @@ def send_screenshot(contact):
             break
 
     if not folder:
-        print("❌ JARVIS: Could not find the Screenshots folder on this PC.")
+        print(" Could not find the Screenshots folder on this PC.")
         return
 
     path = get_latest_screenshot(folder)
 
     if not path:
-        print(f"❌ No screenshots found in {folder}")
+        print(f" No screenshots found in {folder}")
         return
 
-    print("📸 Sending:", path)
+    # print("📸 Sending:", path)
 
     # 🔥 Step 2: Load image
     img = Image.open(path)
@@ -196,10 +199,11 @@ def send_screenshot(contact):
     pyautogui.press("enter")
     pyautogui.press("enter")
 
-    print(f"✅ Latest screenshot sent to {contact}")
+    print(f"Latest screenshot sent to {contact}")
 
 # --------- VOICE CALL ---------
 def voice_call(contact):
+    print(f"Voice calling {contact}")
     focus_whatsapp()
     time.sleep(1)
 
@@ -239,10 +243,11 @@ def voice_call(contact):
     
 
 
-    print("🎥 Video calling", contact)
+    # print("🎥 Video calling", contact)
 
 # ------ VIDEO CALL -------    
 def video_call(contact):
+    print(f"Video calling {contact}")
     focus_whatsapp()
     time.sleep(1)
 
@@ -280,28 +285,12 @@ def video_call(contact):
 
     pyautogui.press("enter")
     
-    print("🎥 Video calling", contact)
+    # print("🎥 Video calling", contact)
     
-# ----- MUTE/UNMUTE CALL ------------   
-def mute_call():
-    print("🔇 Muting system microphone...")
-    time.sleep(1)
-
-    pyautogui.hotkey("win", "alt", "k")
-
-    print("✅ Mic muted")
-
-
-def unmute_call():
-    print("🔊 Unmuting system microphone...")
-    time.sleep(1)
-
-    pyautogui.hotkey("win", "alt", "k")
-
-    print("✅ Mic unmuted")
         
 # ---------- CHECK STATUS ---------      
 def open_status_by_click(contact):
+    print(f"Opening status of {contact}")
 
     open_whatsapp()
     time.sleep(2)
@@ -330,7 +319,7 @@ def open_status_by_click(contact):
     time.sleep(0.5)
     pyautogui.click()
 
-    print("👁️ Status opened")
+    # print("👁️ Status opened")
     
 
 # -------- VOICE MESSAGE -----------
@@ -421,11 +410,11 @@ def send_attachment(contact, filename, search_location=None):
                 break
 
     if not file_path:
-        print(f"❌ JARVIS: Could not find '{filename}' on Desktop or other folders.")
+        print(f"Could not find '{filename}' on Desktop or other folders.")
         return
 
     # --- STEP 2: PORTABLE UI NAVIGATION ---
-    print(f"📎 JARVIS: Path verified: {file_path}")
+    # print(f"📎 JARVIS: Path verified: {file_path}")
     focus_whatsapp()
 
     # Universal Search shortcut
@@ -466,7 +455,7 @@ def send_attachment(contact, filename, search_location=None):
     time.sleep(0.3)
     pyautogui.press("enter")
     
-    print(f"✅ JARVIS: Document sent to {contact}")
+    print(f"Document sent to {contact}")
     
    
    
@@ -532,7 +521,7 @@ def send_contact_card(target_person, contact_to_share):
     
 # -------- READ LATEST MESSAGE FROM SPECIFIC PERSON --------
 def read_specific_message(contact):
-    print(f"🔍 JARVIS: Retrieving latest messages from {contact}...")
+    print(f" Retrieving latest messages from {contact}...")
     focus_whatsapp()
     time.sleep(1)
 
@@ -592,16 +581,16 @@ def read_specific_message(contact):
 
     # 5. Output the result
     if not all_messages:
-        print(f"📭 JARVIS: Could not read a message from {contact}.")
+        print(f"Could not read a message from {contact}.")
         # speak(f"Could not read a message from {contact}.")
         return
 
     # 🔥 THE CLEAN PRINT FIX
-    print(f"\n📩 JARVIS: Messages from {contact}:")
-    print("--------------------------------------------------")
+    print(f"\n Messages from {contact} is")
+    # print("--------------------------------------------------")
     print(text)
-    print("--------------------------------------------------\n")
-    # speak(f"Here are your messages from {contact}")
+    # print("--------------------------------------------------\n")
+  
     
     # Return focus to the typing box to reset the UI state
     for _ in range(3):
@@ -611,6 +600,7 @@ def read_specific_message(contact):
 # ------ SHOW UNREAD MESSAGES (FILTER ONLY) --------
 
 def show_unread_messages():
+    print("Here are your unread messages")
     focus_whatsapp()
     time.sleep(1)
 

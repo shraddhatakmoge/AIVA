@@ -33,7 +33,7 @@ def open_notepad():
 
 # ---------- CLOSE ---------
 def close_notepad():
-    print("❌ Closing Notepad...")
+    print("Closing Notepad")
     close_app("notepad")
 
 # -------- FOCUS --------
@@ -60,10 +60,11 @@ def focus_notepad():
                 
                 return win
             except Exception as e:
-                print(f"⚠️ Could not focus window: {e}")
+                print(f"I encountered an error trying to bring Notepad to the front")
                 continue
 
     # If no visible window exists on the actual monitor, open it!
+    print("Notepad is not currently open. Launching it for you now")
     return open_notepad()
 
 def click_inside_notepad(win):
@@ -90,6 +91,7 @@ def new_tab():
 
 # -------- WRITE --------
 def write_text(text):
+    print("Writing for you")
     win = focus_notepad() 
     if win:
         # 1. Wait for Windows 11's window animation to fully finish
@@ -104,9 +106,10 @@ def write_text(text):
         time.sleep(0.1)
         pyautogui.hotkey("ctrl", "v")
         
-        print(f"✅ Typed: {text}")
+        # print(f"✅ Typed: {text}")
 # ------ NEW FILe ------
 def new_file():
+    print("Opening new file")
     win = focus_notepad()
     if win:
         pyautogui.hotkey("ctrl", "n")
@@ -127,8 +130,8 @@ def save_file(filename="notes.txt"):
         # ✅ FIXED PATH
         desktop = os.path.join(os.path.expanduser("~"), "Desktop")
         current_file = os.path.join(desktop, filename)
-
-        print("Saved at:", current_file)
+        print(f"saving file as {filename}")
+        # print("Saved at:", current_file)
 
 # ------ READ ------
 def read_notepad():
@@ -156,7 +159,7 @@ def read_notepad():
             print("There is no text")
             return
 
-        print("\n--- Notepad Content ---\n")
+        # print("\n--- Notepad Content ---\n")
         print(text)
 
        
@@ -181,7 +184,7 @@ def replace_word(old, new):
         text = pyperclip.paste()
 
         if not text.strip():
-            print("❌ There is no text")
+            print("Notepad completely empty")
             return
 
         # Replace text natively in Python
@@ -215,7 +218,7 @@ def delete_word(word):
         text = pyperclip.paste()
 
         if not text.strip():
-            print("There is no text")
+            print("Notepad is completely empty")
             return
 
         # 🔥 THE FIX: Use regex to find the exact phrase (case-insensitive) and remove it!
@@ -234,17 +237,18 @@ def delete_word(word):
 
 # --------- NEW LINE --------
 def new_line():
+    print("Going to new line")
     win = focus_notepad()
     if win:
        
         pyautogui.press("enter")
-        print("New line added")
+        # print("New line added")
 
 # --------- INSERT TEXT AT CURSOR -----
 def insert_at_cursor(text):
     win = focus_notepad()
     if not win:
-        print("❌ Could not find or open Notepad.")
+        print("Could not find or open Notepad")
         return
 
     # ⚠️ CRITICAL: Do NOT call click_inside_notepad() here!
@@ -259,13 +263,13 @@ def insert_at_cursor(text):
     
     pyautogui.hotkey("ctrl", "v")
 
-    print(f"✅ Inserted '{text}' at the current cursor position")
+    print(f"Inserted '{text}' at the current cursor position")
         
 # --------- INSERT TEXT AT LINE -----
 def insert_text_at_line(text_to_insert, line_number):
     win = focus_notepad()
     if not win:
-        print("❌ Could not find or open Notepad.")
+        print("❌ Could not find or open Notepad")
         return
 
     click_inside_notepad(win)
@@ -291,12 +295,12 @@ def insert_text_at_line(text_to_insert, line_number):
             print(f"✅ Inserted '{text_to_insert}' at line 1 (Blank file)")
             return
         else:
-            print("⚠️ Notepad is empty! Cannot insert at that line yet.")
+            print("⚠️ Notepad is empty! Cannot insert at that line yet")
             return
 
     # Safety: Don't paste Python code
     if "def " in text and "import " in text:
-        print("⚠️ Warning: Grabbed script code instead of Notepad text. Aborting.")
+        print("⚠️ Warning: Grabbed script code instead of Notepad text. Aborting")
         return
 
     # 3. Process the text in Python
@@ -339,10 +343,11 @@ def insert_text_at_line(text_to_insert, line_number):
         print(f"✅ Appended '{text_to_insert}' to new line {line_number}")
         
     else:
-        print(f"❌ Invalid line. Document only has {len(lines)} lines.")
+        print(f"❌ Invalid line. Document only has {len(lines)} lines")
    
 # ------ CURSOR MOVE -----
 def move_cursor(direction):
+    print(f"Moving cursor {direction}")
     win = focus_notepad()
     if win:
         # ❌ REMOVE click_inside_notepad(win)
@@ -350,22 +355,22 @@ def move_cursor(direction):
 
         pyautogui.press(direction)
 
-        print(f"Moved cursor {direction}")
+        # print(f"Moved cursor {direction}")
              
 # ------- NEW PARAGRAPH ----------
 def new_paragraph():
+    print("Going to new paragraph")
     win = focus_notepad()
     if win:
         pyautogui.press("enter")
         pyautogui.press("enter")
-        print("New paragraph added")
+        # print("New paragraph added")
 
 # ----- DELETE WORD FROM LINE -----
-
 def delete_word_from_line(word, line_number):
     win = focus_notepad()
     if not win:
-        print("❌ Could not find or open Notepad.")
+        print("❌ Could not find or open Notepad")
         return
 
     # Click to ensure focus
@@ -386,7 +391,7 @@ def delete_word_from_line(word, line_number):
 
     # Safety checks
     if text == "EMPTY_MARKER" or not text.strip():
-        print("⚠️ Notepad is empty or copy failed.")
+        print("⚠️ Notepad is empty or copy failed")
         return
     if "def " in text and "import " in text:
         print("⚠️ Warning: Grabbed script code instead of Notepad text. Aborting.")
@@ -423,7 +428,7 @@ def delete_word_from_line(word, line_number):
         
         print(f"✅ Removed '{word}' from line {line_number}")
     else:
-        print(f"❌ Invalid line. The document only has {len(lines)} lines.")
+        print(f"❌ Invalid line. The document only has {len(lines)} lines")
     
 # --------- UNDO (STABILIZED) --------
 def undo_action():
@@ -434,7 +439,7 @@ def undo_action():
 
         # The interval=0.1 forces Python to hold Ctrl, hold Z, release Z, release Ctrl.
         pyautogui.hotkey("ctrl", "z", interval=0.1)
-        print("✅ Undo executed")
+        print("Undo executed")
 
 # ------ REDO (STABILIZED) -----------
 def redo_action():
@@ -445,10 +450,11 @@ def redo_action():
 
         # In Windows 11, Redo is standard as Ctrl+Y 
         pyautogui.hotkey("ctrl", "y", interval=0.1)
-        print("✅ Redo executed")
+        print("Redo executed")
                    
 # -------- CLEAR --------
 def clear_notepad():
+    print("Clearing notepad for you")
     win = focus_notepad()
     if win:
         click_inside_notepad(win)
@@ -460,7 +466,7 @@ def clear_notepad():
         
         # Press backspace (often more reliable than delete in Notepad)
         pyautogui.press("backspace") 
-        print("✅ Notepad cleared")
+        # print("Notepad cleared")
 
 
 # -------- DELETE SPECIFIC LINE --------
@@ -514,7 +520,7 @@ def press_space():
     time.sleep(0.2) 
     
     pyautogui.press("space")
-    print("✅ Pressed Space")
+    print("Pressed Space")
 
 
 # -------- MAIN COMMAND HANDLER --------

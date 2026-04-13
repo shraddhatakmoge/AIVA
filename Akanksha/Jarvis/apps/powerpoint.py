@@ -7,7 +7,6 @@ from common import close_app
 
 
 # -------- FOCUS POWERPOINT --------
-# -------- FOCUS POWERPOINT --------
 def focus_pp():
     # Look for PowerPoint windows
     windows = gw.getWindowsWithTitle("PowerPoint")
@@ -29,11 +28,11 @@ def focus_pp():
                 time.sleep(0.2)
                 return win
             except Exception as e:
-                print(f"⚠️ JARVIS: Could not focus PowerPoint: {e}")
+                print(f"I encountered an error trying to bring PowerPoint to the front")
                 continue
 
     # If no physical window is found, launch it
-    print("🚀 JARVIS: PowerPoint not found in foreground. Launching...")
+    print("PowerPoint not found in foreground. Launching")
     os.system("start powerpnt")
     time.sleep(2)
     return None
@@ -43,7 +42,7 @@ def open_powerpoint():
     """
     Universal Launch: Uses the official executable name 'powerpnt'.
     """
-    print("🚀 JARVIS: Opening Microsoft PowerPoint...")
+    print(" Opening Microsoft PowerPoint...")
     try:
         # 'powerpnt' is the universal command for all versions of PP
         os.startfile("powerpnt") 
@@ -55,7 +54,7 @@ def open_powerpoint():
         pyautogui.press('enter')
         print("✅ PowerPoint is ready.")
     except Exception as e:
-        print(f"❌ Error opening PowerPoint: {e}")
+        print(f"I encountered an error trying to bring Powerpoint to the front")
 
 def add_slide():
     """
@@ -66,9 +65,9 @@ def add_slide():
         time.sleep(0.5)
         # Ctrl + M is the global shortcut for a new slide
         pyautogui.hotkey('ctrl', 'm')
-        print("✅ JARVIS: New slide added.")
+        print(" New slide added.")
     else:
-        print("❌ PowerPoint not found. Opening it now...")
+        print(" PowerPoint not found. Opening it now...")
         open_powerpoint()
 
 
@@ -84,16 +83,16 @@ def set_slide_title(text):
         # 1. Try to find the built-in Title placeholder
         try:
             slide.Shapes.Title.TextFrame.TextRange.Text = text
-            print(f"✅ JARVIS: Title set to '{text}'")
+            print(f" Title set to '{text}'")
         except:
             # 2. Fallback: Search all shapes for a text box
             for shape in slide.Shapes:
                 if shape.HasTextFrame:
                     shape.TextFrame.TextRange.Text = text
-                    print(f"✅ JARVIS: Text set in available box: '{text}'")
+                    print(f"Text set in available box: '{text}'")
                     return
     except Exception as e:
-        print(f"❌ PowerPoint Error: {e}")
+        print(f"I encountered an error trying to bring Notepad to the front")
         
 
 # -------- SET CONTENT --------
@@ -108,19 +107,19 @@ def set_slide_content(text):
             if shape.HasTextFrame and (shape.Type == 2 or "Content" in shape.Name):
                 shape.TextFrame.TextRange.Text = text
                 found_box = True
-                print(f"✅ JARVIS: Content set!")
+                print(f" Content set!")
                 break
         
         # 🔥 IF NO BOX FOUND: Create a new text box automatically!
         if not found_box:
-            print("⚠️ No box found. Creating a new one for you...")
+            print("⚠️ No box found. Creating a new one for you")
             # Left=100, Top=150, Width=500, Height=300
             new_box = slide.Shapes.AddTextbox(Orientation=1, Left=100, Top=150, Width=500, Height=300)
             new_box.TextFrame.TextRange.Text = text
-            print("✅ JARVIS: Created a new box and added the content.")
+            print(" Created a new box and added the content.")
             
     except Exception as e:
-        print(f"❌ PowerPoint Content Error: {e}")
+        print(f"I encountered an error trying to bring Powerpoint to the front")
         
 # -------- SET SUBTITLE -------------
 def set_slide_subtitle(text):
@@ -131,7 +130,7 @@ def set_slide_subtitle(text):
         slide = pp_app.ActiveWindow.View.Slide
         
         found_subtitle = False
-        print(f"🔍 JARVIS: Scanning {slide.Shapes.Count} shapes for Subtitle...")
+        print(f"Scanning {slide.Shapes.Count} shapes for Subtitle...")
 
         for shape in slide.Shapes:
             shape_name = shape.Name.lower()
@@ -156,7 +155,7 @@ def set_slide_subtitle(text):
                 break
         
         if not found_subtitle:
-            print("⚠️ JARVIS: I checked every box, but couldn't find a valid subtitle placeholder.")
+            print("I checked every box, but couldn't find a valid subtitle placeholder.")
                 
     except Exception as e:
         print(f"❌ PowerPoint Subtitle Error: {e}")
@@ -172,15 +171,15 @@ def delete_slide(slide_no=None):
         if slide_no:
             # Delete by specific number (1-based index)
             presentation.Slides(int(slide_no)).Delete()
-            print(f"✅ JARVIS: Deleted slide number {slide_no}")
+            print(f" Deleted slide number {slide_no}")
         else:
             # Delete the one currently on screen
             current_index = pp_app.ActiveWindow.View.Slide.SlideIndex
             presentation.Slides(current_index).Delete()
-            print(f"✅ JARVIS: Deleted current slide ({current_index})")
+            print(f" Deleted current slide ({current_index})")
             
     except Exception as e:
-        print(f"❌ PowerPoint Delete Error: {e}")
+        print(f"I encountered an error trying to bring Powerpoint to the front")
         
         
 # -------- NAVIGATOR SLIDESHOW -------------
@@ -203,19 +202,19 @@ def navigate_slide(target):
         if target == "next":
             if current_index < presentation.Slides.Count:
                 view.GotoSlide(current_index + 1)
-                print(f"✅ JARVIS: Moved to slide {current_index + 1}")
+                print(f" Moved to slide {current_index + 1}")
         elif target == "previous":
             if current_index > 1:
                 view.GotoSlide(current_index - 1)
-                print(f"✅ JARVIS: Moved to slide {current_index - 1}")
+                print(f" Moved to slide {current_index - 1}")
         else:
             # Handle numbers like "slide 3"
             slide_no = int(target)
             view.GotoSlide(slide_no)
-            print(f"✅ JARVIS: Jumped to slide {slide_no}")
+            print(f"Jumped to slide {slide_no}")
             
     except Exception as e:
-        print(f"❌ PowerPoint Navigation Error: {e}")
+        print(f"I encountered an error trying to bring Powerpoint to the front")
 
 # ------- SLIDESHOW --------------
 def start_slideshow():
@@ -224,15 +223,15 @@ def start_slideshow():
         
         pyautogui.press('f5')
     else:
-        print("❌ JARVIS: PowerPoint is not open to start a show.")
+        print(" PowerPoint is not open to start a show.")
 
 def stop_slideshow():
     """Exits the slideshow mode by pressing Escape."""
     if focus_pp():
-        print("🛑 JARVIS: Stopping Slideshow...")
+        print("Stopping Slideshow...")
         pyautogui.press('esc')
     else:
-        print("❌ JARVIS: PowerPoint not found.")
+        print("PowerPoint not found.")
 
 # Note: Your existing navigate_slide already handles 'next' and 'previous' 
 # by checking if a SlideshowWindow exists!
@@ -247,7 +246,7 @@ def apply_presentation_theme(theme_name):
         # 🟢 STEP 1: Try the direct name (Works for some Office 365 versions)
         try:
             presentation.ApplyTemplate(theme_name)
-            print(f"🎨 JARVIS: Applied theme '{theme_name}' directly.")
+            print(f"Applied theme '{theme_name}' directly.")
             return
         except:
             pass
@@ -263,13 +262,13 @@ def apply_presentation_theme(theme_name):
         for path in possible_paths:
             if os.path.exists(path):
                 presentation.ApplyTemplate(path)
-                print(f"🎨 JARVIS: Theme applied from {path}")
+                print(f"Theme applied from {path}")
                 return
 
-        print(f"❌ JARVIS: Could not find theme '{theme_name}' on your disk.")
+        print(f" Could not find theme '{theme_name}' on your disk.")
             
     except Exception as e:
-        print(f"❌ PowerPoint Theme Error: {e}")
+        print(f"I encountered an error trying to bring Powerpoint to the front")
         
 # -------- CLOSE --------
 def close_powerpoint():

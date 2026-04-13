@@ -31,7 +31,7 @@ def open_spotify():
     """
     Universal Open: Uses Windows URI to launch Spotify without hardcoded paths.
     """
-    print("🚀 JARVIS: Attempting to launch Spotify...")
+    print(" Attempting to launch Spotify...")
     
     # 1. THE UNIVERSAL WAY: URI Scheme works for all installations
     # This replaces looking for specific AppData folders.
@@ -52,13 +52,14 @@ def open_spotify():
         pyautogui.press("enter")
     
     # Only one message at the end
-    print("✅ Spotify opened")
+    # print("Spotify opened")
 
 # ---------------- CLOSE ----------------
 def close_spotify():
+    print("Closing Spotify")
     # Notice the /t added right after Spotify.exe !
     os.system("taskkill /f /im Spotify.exe /t >nul 2>&1")
-    print("✅ Spotify closed")
+    # print("✅ Spotify closed")
 
 # ---------------- PLAY SONG ----------------
 def play_song(song):
@@ -132,7 +133,7 @@ def like_song():
     """
     Robust Portable Version: Forces a 'Physical' key hold instead of coordinates.
     """
-    print("⏳ JARVIS: Attempting to like current track...")
+    print("Attempting to like current track...")
     
     # Use your existing focus function to bring Spotify to the front
     if not focus_spotify():
@@ -153,4 +154,4 @@ def like_song():
     pyautogui.keyUp('shift')
     pyautogui.keyUp('alt')
     
-    print("✅ JARVIS: Song added to Liked Songs using Alt+Shift+B")
+    print("Song added to Liked Songs ")

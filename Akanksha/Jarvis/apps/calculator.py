@@ -10,12 +10,13 @@ import re
 # ==============================
 
 def open_calculator():
+    print("Opening calculator")
     try:
         subprocess.Popen("calc.exe")
         time.sleep(1.5)  # Give Windows time to open the app
-        print("✅ Opened Calculator")
+        # print("✅ Opened Calculator")
     except Exception as e:
-        print(f"❌ Failed to open Calculator: {e}")
+        print(f"I encountered an error trying to bring Calculator to the front")
 
 def close_calculator():
     response = os.system("taskkill /f /im CalculatorApp.exe >nul 2>&1")
@@ -43,7 +44,7 @@ def ensure_calculator_active():
             time.sleep(0.5)
             return True
     except Exception as e:
-        print(f"Window activation error: {e}")
+        print(f"I encountered an error trying to bring Calculator to the front")
     return False
 
 # ==============================
