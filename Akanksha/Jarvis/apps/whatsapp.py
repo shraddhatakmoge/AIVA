@@ -87,26 +87,39 @@ def send_message(text):
 # -------- SEND TO CONTACT --------
 def send_message_to(contact, text):
     global last_message
-    print(f"Sending message to {contact}")
+    
+    # Keeping your preference: eventually swap this print for your engine.speak()
+    print(f"Sending message to {contact}") 
+    
+    # 1. Guarantee Focus
     focus_whatsapp()
-    time.sleep(2)
+    time.sleep(2) # Extra buffer for the UI to completely settle
 
+    # 2. Open Search
     pyautogui.hotkey("ctrl", "f")
-    time.sleep(1)
+    time.sleep(1.5) # WhatsApp search animations can be laggy
+    pyautogui.hotkey("ctrl", "a")
+    time.sleep(0.2)
+    pyautogui.press("backspace")
+    time.sleep(0.3)
 
+
+    # 3. Type Contact Name
     pyautogui.write(contact)
-    time.sleep(2)
+    time.sleep(2.5) # 🔥 CRITICAL: Wait for the network to fetch the contact list
 
+    # 4. Select Contact and Open Chat
     pyautogui.press("down")
+    time.sleep(0.2)
     pyautogui.press("enter")
-    time.sleep(1)
+    time.sleep(1.5) # Wait for the chat screen to slide in
 
-    pyautogui.write(text)
+    # 5. Type Message and Send
+    pyautogui.write(text, interval=0.02)
+    time.sleep(0.5)
     pyautogui.press("enter")
 
     last_message = text
-    # print(f"📤 Sent to {contact}: {text}")
-
 
 # =========================================
 # 🚀 NEW FEATURES START HERE

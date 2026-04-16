@@ -388,8 +388,26 @@ def process_nlp(command, current_app="notepad"):
         }
     
     # 2. OTHER WHATSAPP COMMANDS
+    # 2. OTHER WHATSAPP COMMANDS
+    
+    # 1st Priority: Match messages with a specific contact
+    match_send_to = re.search(r"send message (.*?) to (.*)", raw_text_command, re.IGNORECASE)
+    if match_send_to: 
+        return {
+            "app": "whatsapp", 
+            "action": "send_to", 
+            "text": match_send_to.group(1).strip(),
+            "contact": match_send_to.group(2).strip()
+        }
+    
+    # 2nd Priority: Fallback for sending to whoever is already open on screen
     match_send = re.search(r"send message (.*)", raw_text_command, re.IGNORECASE)
-    if match_send: return {"app": "whatsapp", "action": "send", "text": match_send.group(1).strip()}
+    if match_send: 
+        return {
+            "app": "whatsapp", 
+            "action": "send", 
+            "text": match_send.group(1).strip()
+        }
     
     match_screenshot = re.search(r"send screenshot to (.*)", cmd)
     if match_screenshot: return {"app": "whatsapp", "action": "screenshot", "contact": match_screenshot.group(1).strip()}
