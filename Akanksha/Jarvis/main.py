@@ -569,8 +569,8 @@ def process_command(command):
     if any(word in command for word in styling_keywords) and "and" in command:
         parts = [command] # Treat as one single command
     else:
-        # Keep your original splitting logic for other commands
-        parts = re.split(r'\b(?:and then|then)\b', command) 
+        # 🔥 Add 'and' to the split logic so it handles multiple actions
+        parts = re.split(r'\b(?:and then|and|then)\b', command)
     
     for part in parts:
         part = part.strip()

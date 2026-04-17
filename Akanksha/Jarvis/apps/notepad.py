@@ -20,7 +20,19 @@ pyautogui.PAUSE = 0.1
 
 # -------- OPEN --------
 def open_notepad():
-    print("🚀 Launching Notepad...")
+    # 1. Check if Notepad is already open to prevent duplicate instances
+    windows = gw.getWindowsWithTitle("Notepad")
+    for win in windows:
+        if win.width > 10 and win.left > -10000:
+            engine.say("Notepad is already open.")
+            engine.runAndWait()
+            # Bring the existing window to the front
+            return focus_notepad()
+
+    # 2. If it is not open, launch a new instance
+    engine.say("Launching Notepad.")
+    engine.runAndWait()
+    
     os.system("start notepad")
     time.sleep(2) # Give Windows time to render the UI
     
@@ -29,8 +41,8 @@ def open_notepad():
     for win in windows:
         if win.width > 10 and win.left > -10000:
             return win
+            
     return None
-
 # ---------- CLOSE ---------
 def close_notepad():
     print("Closing Notepad")
