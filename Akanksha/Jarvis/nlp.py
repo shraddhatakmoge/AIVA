@@ -330,20 +330,23 @@ def process_nlp(command, current_app="notepad"):
                 return {"app": "spotify", "action": "play", "text": query_map[mood]}
         
         if "your mood" in cmd or "you like" in cmd: return {"app": "spotify", "action": "play", "text": "Sture Zetterberg Mix"}
-        if "open" in cmd: return {"app": "spotify", "action": "open"}
-        if "close" in cmd: return {"app": "spotify", "action": "close"}
+        # 🔥 THE FIX: Use regex word boundaries (\b) to prevent partial matches
+        if re.search(r"\bopen\b", cmd): return {"app": "spotify", "action": "open"}
+        if re.search(r"\bclose\b", cmd): return {"app": "spotify", "action": "close"}
    
-    if "like" in cmd: return {"app": "spotify", "action": "like"} 
+    # 🔥 Also update "like" so it doesn't accidentally trigger on words like "alike"
+    if re.search(r"\blike\b", cmd): return {"app": "spotify", "action": "like"}
 
     match_play = re.search(r"(?:play|listen to) (.*?)(?: on spotify)?$", raw_text_command, re.IGNORECASE)
     if match_play:
         clean_song = match_play.group(1).strip()
         if clean_song: return {"app": "spotify", "action": "play", "text": clean_song}
 
-    if "pause" in cmd: return {"app": "spotify", "action": "pause"}
-    if "resume" in cmd or cmd == "play": return {"app": "spotify", "action": "resume"}
-    if "next" in cmd: return {"app": "spotify", "action": "next"}
-    if "previous" in cmd: return {"app": "spotify", "action": "previous"}
+    # 🔥 Update these as well just to be safe!
+    if re.search(r"\bpause\b", cmd): return {"app": "spotify", "action": "pause"}
+    if re.search(r"\bresume\b", cmd) or cmd == "play": return {"app": "spotify", "action": "resume"}
+    if re.search(r"\bnext\b", cmd): return {"app": "spotify", "action": "next"}
+    if re.search(r"\bprevious\b", cmd): return {"app": "spotify", "action": "previous"}
         
     # =========================================
     # 🧮 CALCULATOR 

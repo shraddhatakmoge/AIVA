@@ -533,6 +533,7 @@ def is_nlp_confident(data):
 
     # No app and no action = NLP found nothing useful
     if app is None and action is None:
+
         return False
 
     return True
