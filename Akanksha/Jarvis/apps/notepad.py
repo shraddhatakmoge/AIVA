@@ -7,12 +7,7 @@ import pyperclip
 import pyttsx3
 from common import open_system_app, close_app
 
-engine = pyttsx3.init()
 
-
-    
-    
-pyautogui.FAILSAFE = False
 pyautogui.PAUSE = 0.1
 
 
@@ -24,14 +19,12 @@ def open_notepad():
     windows = gw.getWindowsWithTitle("Notepad")
     for win in windows:
         if win.width > 10 and win.left > -10000:
-            engine.say("Notepad is already open.")
-            engine.runAndWait()
+            print("Notepad is already .")
             # Bring the existing window to the front
             return focus_notepad()
 
     # 2. If it is not open, launch a new instance
-    engine.say("Launching Notepad.")
-    engine.runAndWait()
+    print("Launching Notepad.")
     
     os.system("start notepad")
     time.sleep(2) # Give Windows time to render the UI
@@ -43,6 +36,8 @@ def open_notepad():
             return win
             
     return None
+
+
 # ---------- CLOSE ---------
 def close_notepad():
     print("Closing Notepad")
