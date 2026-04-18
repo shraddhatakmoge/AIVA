@@ -81,9 +81,6 @@ def execute_action(data, original_command=""):
     # ==============================
     # 📂 FILE SYSTEM (NEW)
     # ==============================
-    # ==============================
-    # 📂 FILE SYSTEM (NEW)
-    # ==============================
     if app == "file_system":
         intent = data.get("intent")
         entities = data.get("entities", {})

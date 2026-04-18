@@ -109,6 +109,11 @@ def click_first_result():
     # 🔥 OPTIONAL: press enter to force play
     pyautogui.press("enter")
     
+    pyautogui.press("tab")
+    pyautogui.press("tab")
+    pyautogui.press("enter")
+    
+    
 # ---------------- CONTROLS ----------------
 def pause_music():
     pyautogui.press("playpause")
