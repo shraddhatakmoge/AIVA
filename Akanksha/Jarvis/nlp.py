@@ -47,7 +47,7 @@ def process_nlp(command, current_app="notepad"):
         result["app"] = "powerpoint"
     elif ("word" in cmd or "document" in cmd) and not any(x in cmd for x in ["delete word", "replace word"]):
         result["app"] = "word"
-    elif any(x in cmd for x in ["calculator", "calculate", "math", "+", "-", "*", "/"]):
+    elif any(x in cmd for x in ["calculator", "math", "+", "-", "*", "/"]) or re.search(r"\bcalculate\b", cmd):
         result["app"] = "calculator"
     elif any(x in cmd for x in ["whatsapp", "message", "call", "chat", "send "]):
         result["app"] = "whatsapp"
@@ -356,7 +356,7 @@ def process_nlp(command, current_app="notepad"):
     
     if re.search(r"\b(square|root|factorial|pi|power)\b", cmd): return {"app": "calculator", "action": "calculate", "expression": None}
     
-    match_calc = re.search(r"(?:calculate|what is|whats) (.*)", cmd)
+    match_calc = re.search(r"\b(?:calculate|what is|whats)\b (.*)", cmd)
     if match_calc or any(word in cmd for word in ["+", "-", "*", "/", "divide", "multiply"]):
         expr = match_calc.group(1) if match_calc else cmd
         expr = expr.replace("plus", "+").replace("minus", "-").replace("multiply", "*").replace("multiplied by", "*").replace("x", "*").replace("divide", "/").replace("divided by", "/")
@@ -390,7 +390,6 @@ def process_nlp(command, current_app="notepad"):
             "contact": match_attachment.group(3).strip()
         }
     
-    # 2. OTHER WHATSAPP COMMANDS
     # 2. OTHER WHATSAPP COMMANDS
     
     # 1st Priority: Match messages with a specific contact
